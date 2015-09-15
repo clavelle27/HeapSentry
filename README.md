@@ -1,3 +1,7 @@
+Instructions:
+`make` compile
+`make install` for installation
+
 Project Description:
 Course project for CSE509:System Security. (Fall 2015)
 Heap overflows are as deadly as stack overflows. An attacker can take advantage
