@@ -1,0 +1,1 @@
+int heapsentryu_init();

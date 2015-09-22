@@ -1,7 +1,9 @@
 all:
+	${MAKE} -C src/heapsentryu
 	${MAKE} -C src
 
 clean:
+	${MAKE} -C src/heapsentryu clean
 	${MAKE} -C src clean
 
 install:

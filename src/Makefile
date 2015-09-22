@@ -3,9 +3,9 @@ CFLAGS=-O0 -std=c99 -Wall -Werror -I../include -fPIC -g3
 
 SRCS:=$(shell find . -name \*.c)
 
-.PHONY: heapsentry clean
+.PHONY: testlibu clean
 
-heapsentry: $(SRCS:%.c=%.o) 
+testlibu: $(SRCS:%.c=%.o) 
 		$(CC) -o ../$@ $^ 
 
 %.o: %.c
@@ -13,4 +13,4 @@ heapsentry: $(SRCS:%.c=%.o)
 			$(CC) -c $(CFLAGS) $(OPTS) -o $@ $^ 
 
 clean:
-		rm -rf obj *.o ../heapsentry *.swp
+		rm -rf obj *.o ../testlibu *.swp
