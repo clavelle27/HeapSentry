@@ -13,8 +13,9 @@
 // binary finds symbols from libheapsentryu, for malloc() and
 // free(), before it finds the symbols from stdlib.
 int main(int argc, char *argv[], char *envp[]){
+	printf("sizeof(int): %ld\n",sizeof(int));
 	printf("Calling malloc():\n");
-	int* a = (int*) malloc(sizeof(int));
+	int* a = (int*) malloc(10);
 	printf("malloc returned: %p\n",a);
 	*a = 10;
 	printf("value of a(before):%d\n",*a);
