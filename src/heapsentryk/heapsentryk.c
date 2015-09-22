@@ -14,5 +14,5 @@ static void __exit mod_exit_func(void)
 module_init(mod_entry_func);
 module_exit(mod_exit_func);
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("vnayak@cs.stonybrook.edu");
+MODULE_AUTHOR("heapsentry@cs.stonybrook.edu");
 MODULE_DESCRIPTION("HeapSentry Kernel Module");

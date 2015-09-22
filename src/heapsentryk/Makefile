@@ -1,4 +1,4 @@
-obj-m := heapsentry_kmod.o
+obj-m := heapsentryk.o
 KERNEL_SOURCE := /usr/src/linux
 PWD := $(shell pwd)
 default:
