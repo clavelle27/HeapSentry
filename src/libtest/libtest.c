@@ -1,7 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
-//#include <heapsentryu.h>
 
+// This is just a test binary. Here, actual malloc() and free()
+// functions are invoked. If libheapsentryu is preloaded, then
+// the logs present in libheapsentryu should be printed. This
+// way, we could be certain that malloc() and free() are indeed
+// hijacked. 
+//
+// Notice that header file belonging to libheapsentryu is not
+// included in this file. This file compiles purely based on
+// the symbols present in stdlib. But then, during run-time, the
+// binary finds symbols from libheapsentryu, for malloc() and
+// free(), before it finds the symbols from stdlib.
 int main(int argc, char *argv[], char *envp[]){
 	printf("Calling malloc():\n");
 	int* a = (int*) malloc(sizeof(int));
