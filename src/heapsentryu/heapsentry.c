@@ -1,15 +1,21 @@
 #include <stdio.h>
+#define __USE_GNU
+#include <dlfcn.h>
 
-int heapsentryu_init()
-{
-    printf("libheapsentryu init function\n");
-    printf("libheapsentryu init function - exiting\n");
-    return 1;
-}
+typedef void *(*real_malloc) (size_t size);
+typedef void (*real_free) (void* ptr);
 
-int obj = 10;
 void *malloc(size_t size)
 {
-    printf("malloc from library called.\n");
-    return (void *) &obj;
+	real_malloc rmalloc = (real_malloc) dlsym(RTLD_NEXT, "malloc");
+	printf("malloc from library called.\n");
+	void *obj = rmalloc(size);
+	return obj;
+}
+
+void free(void* ptr)
+{
+	real_free rfree = (real_free) dlsym(RTLD_NEXT, "free");
+	printf("free from heapsentryu library called.\n");
+	return rfree(ptr);
 }
