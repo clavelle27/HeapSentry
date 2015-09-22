@@ -11,10 +11,12 @@ export ROOT_DIR LIB_DIR INCLUDE_DIR
 
 all:
 	${MAKE} -C src/heapsentryu
+	${MAKE} -C src/heapsentryk
 	${MAKE} -C src/libtest
 
 clean:
 	${MAKE} -C src/heapsentryu clean
+	${MAKE} -C src/heapsentryk clean
 	${MAKE} -C src/libtest clean
 
 install:
