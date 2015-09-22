@@ -17,9 +17,25 @@ void **sys_call_table;
 
 void set_read_write(long unsigned int _addr);
 
-asmlinkage void* (*original_mmap) (void *addr, size_t length, int prot, int flags,
-		      int fd, off_t offset);
+asmlinkage void *(*original_mmap) (void *addr, size_t length, int prot,
+				   int flags, int fd, off_t offset);
+asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
+				  int flags, int fd, off_t offset);
 asmlinkage int (*original_munmap) (void *addr, size_t length);
+asmlinkage int heapsentryk_munmap(void *addr, size_t length);
+
+asmlinkage int heapsentryk_munmap(void *addr, size_t length)
+{
+	printk("Entered heapsentryk_munmap()\n");
+	return original_munmap(addr, length);
+}
+
+asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
+				  int flags, int fd, off_t offset)
+{
+	printk("Entered heapsentryk_mmap()\n");
+	return original_mmap(addr, length, prot, flags, fd, offset);
+}
 
 // Init function of this kernel module. This gets executed when the module is
 // loaded into the kernel.
@@ -44,8 +60,16 @@ static int __init mod_entry_func(void)
 
 	printk(KERN_INFO "__NR_mmap:%d\n", __NR_mmap);
 	printk(KERN_INFO "__NR_munmap:%d\n", __NR_munmap);
-	printk(KERN_INFO "original_mmap:%p\n",original_mmap);
-	printk(KERN_INFO "original_munmap:%p\n",original_munmap);
+	printk(KERN_INFO "original_mmap:%p\n", original_mmap);
+	printk(KERN_INFO "original_munmap:%p\n", original_munmap);
+
+
+	// Substituting the system calls with heapsentryk's calls.
+	// In these substituted function, decision can be taken regarding further
+	// actions. Either exiting the process or letting the request through to
+	// original syscalls.
+	sys_call_table[__NR_mmap] = heapsentryk_mmap;
+	sys_call_table[__NR_munmap] = heapsentryk_munmap;
 	return 0;
 }
 
