@@ -1,3 +1,7 @@
+ROOT_DIR:=$(shell pwd)
+LIB_DIR:=$(ROOT_DIR)/lib
+INCLUDE_DIR:=$(ROOT_DIR)/include
+export ROOT_DIR LIB_DIR INCLUDE_DIR
 all:
 	${MAKE} -C src/heapsentryu
 	${MAKE} -C src/libtest
