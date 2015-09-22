@@ -1,10 +1,10 @@
 all:
 	${MAKE} -C src/heapsentryu
-	${MAKE} -C src
+	${MAKE} -C src/libtest
 
 clean:
 	${MAKE} -C src/heapsentryu clean
-	${MAKE} -C src clean
+	${MAKE} -C src/libtest clean
 
 install:
 	sudo mkdir -p /etc/heapsentry

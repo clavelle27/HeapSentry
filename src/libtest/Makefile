@@ -1,16 +1,16 @@
 CC=gcc
 CFLAGS=-O0 -std=c99 -Wall -Werror -I../../include -fPIC -g3 
-
+LIBS=-L../../lib -lheapsentryu
 SRCS:=$(shell find . -name \*.c)
 
-.PHONY: libheapsentryu clean
+.PHONY: libtest clean
 
-libheapsentryu: $(SRCS:%.c=%.o) 
-		$(CC) -shared -o ../../lib/$@.so $^ 
+libtest: $(SRCS:%.c=%.o) 
+		$(CC) -o ../../$@ $^ $(LIBS)
 
 %.o: %.c
 		@mkdir -p $(dir $@)
 			$(CC) -c $(CFLAGS) $(OPTS) -o $@ $^ 
 
 clean:
-		rm -rf obj *.o ../../lib/libheapsentryu.so *.swp
+		rm -rf obj *.o ../../libtest *.swp
