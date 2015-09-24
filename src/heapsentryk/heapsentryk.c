@@ -11,7 +11,23 @@ MODULE_LICENSE("GPL");
 // This value can be found by running the following command at the prompt.
 // $sudo cat /boot/System.map-3.13.0-61-generic | grep sys_call_table
 // The suffix after "System.map-" should be the result of "$uname -r".
-#define SYS_CALL_TABLE_ADDRESS 0xffffffff81801400
+//
+//x86_64 sys_call_table
+//#define SYS_CALL_TABLE_ADDRESS 0xffffffff81801400
+// 
+// Address of ia32_sys_call_table. In x86_64 machine, `int $0x80` did not work.
+// Ideally, `syscall` should be used with a recompiled kernel having a new system
+// call added. However, since the goal is just to introduce a communication channel
+// between heapsentryu and heapsentryk, 32 bit sys_call_table is used in this module.
+//ia-32 ia32_sys_call_table
+#define SYS_CALL_TABLE_ADDRESS 0xffffffff81809ca0
+
+// Look into /usr/include/asm-generic/unistd.h for all the system call numbers.
+// The array holding function pointers to system calls in kernel is indexed by these
+// numbers. There are placeholders (I guess) for new calls and the array is not completely
+// filled up. One such `hole` is in the range 279-1023. So, using 280 here. This is the
+// system call number which userspace needs to invoke to reach heapsentryk's system call.
+#define SYS_SENTRY 280 
 
 void **sys_call_table;
 
@@ -23,17 +39,30 @@ asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
 				  int flags, int fd, off_t offset);
 asmlinkage int (*original_munmap) (void *addr, size_t length);
 asmlinkage int heapsentryk_munmap(void *addr, size_t length);
+asmlinkage size_t sys_heapsentryk_canary(size_t length);
+
+// System call which receives the canary information from heapsentryu
+// and stores it in its symbol table. This information is used by
+// high-risk calls to verify the canaries.
+asmlinkage size_t sys_heapsentryk_canary(size_t length){
+	printk("Entering sys_heapsentryk_canary\n");
+	// TODO: Change the parameters to receive the canary information in bulk.
+	// This bulk count will be user configurable in the userspace.
+	// 
+	// Implement Hash tables or find out a good library which does our job easier.
+	return 30;
+}
 
 asmlinkage int heapsentryk_munmap(void *addr, size_t length)
 {
-	printk("Entered heapsentryk_munmap()\n");
+	//printk(KERN_INFO "Entered heapsentryk_munmap()\n");
 	return original_munmap(addr, length);
 }
 
 asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
 				  int flags, int fd, off_t offset)
 {
-	printk("Entered heapsentryk_mmap()\n");
+	//printk("KERN_INFO Entered heapsentryk_mmap()\n");
 	return original_mmap(addr, length, prot, flags, fd, offset);
 }
 
@@ -41,7 +70,7 @@ asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
 // loaded into the kernel.
 static int __init mod_entry_func(void)
 {
-	printk(KERN_INFO "heapsentryk entering...\n");
+	//printk(KERN_INFO "heapsentryk entering...\n");
 
 	// Setting the address of the system call table here.
 	sys_call_table = (void *)SYS_CALL_TABLE_ADDRESS;
@@ -58,18 +87,19 @@ static int __init mod_entry_func(void)
 	original_mmap = sys_call_table[__NR_mmap];
 	original_munmap = sys_call_table[__NR_munmap];
 
-	printk(KERN_INFO "__NR_mmap:%d\n", __NR_mmap);
-	printk(KERN_INFO "__NR_munmap:%d\n", __NR_munmap);
-	printk(KERN_INFO "original_mmap:%p\n", original_mmap);
-	printk(KERN_INFO "original_munmap:%p\n", original_munmap);
-
-
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
 	// actions. Either exiting the process or letting the request through to
 	// original syscalls.
 	sys_call_table[__NR_mmap] = heapsentryk_mmap;
 	sys_call_table[__NR_munmap] = heapsentryk_munmap;
+	
+	printk("SYS_SENTRY:%d\n",SYS_SENTRY);
+	printk("Value present at sys_call_table[SYS_SENTRY]before:%p\n",sys_call_table[SYS_SENTRY]);
+	sys_call_table[SYS_SENTRY] = sys_heapsentryk_canary;
+	printk("Value present at sys_call_table[SYS_SENTRY]after:%p\n",sys_call_table[SYS_SENTRY]);
+	
+
 	return 0;
 }
 
@@ -80,6 +110,10 @@ static void __exit mod_exit_func(void)
 	// Restoring the original addresses of the system calls in the table.
 	sys_call_table[__NR_mmap] = original_mmap;
 	sys_call_table[__NR_munmap] = original_munmap;
+
+	//TODO: Do not set this to NULL.
+	// Cache the initial value above and then reset it back here.
+	sys_call_table[SYS_SENTRY] = 0;
 
 	printk(KERN_INFO "heapsentryk exiting...\n");
 }
