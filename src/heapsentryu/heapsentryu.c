@@ -79,7 +79,7 @@ void free(void *ptr)
 
 size_t sys_canary(int* canary_location, int canary){
 	size_t r = -1;
-	size_t n = 280;
+	size_t n = (size_t)SYS_CALL_NUMBER;
 	printf("libheapsentryu:sending: canary_location:[%p] canary:[%d]\n",canary_location,canary);
 	// Below instruction puts the input parameter in rdx, system call
 	// number in rax and triggers an interrupt.

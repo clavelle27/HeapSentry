@@ -20,7 +20,9 @@ MODULE_LICENSE("GPL");
 // call added. However, since the goal is just to introduce a communication channel
 // between heapsentryu and heapsentryk, 32 bit sys_call_table is used in this module.
 // ia-32: ia32_sys_call_table
-#define SYS_CALL_TABLE_ADDRESS 0xffffffff81809ca0
+// #define SYS_CALL_TABLE_ADDRESS 0xffffffff81809ca0
+//
+// Note: This value now comes from makefile to make it configurable.
 
 // Look into /usr/include/asm-generic/unistd.h for all the system call numbers.
 // The array holding function pointers to system calls in kernel is indexed by these
