@@ -5,6 +5,7 @@
 # nested makefiles invoked from this makefile. `:=` makes the
 # variables, non-modifiable.
 
+CANARY_GROUP_SIZE:=5
 SYS_CALL_TABLE_ADDRESS:=0xffffffff81809ca0
 SYS_CALL_NUMBER:=280
 ROOT_DIR:=$(shell pwd)
@@ -12,7 +13,7 @@ LIB_DIR:=$(ROOT_DIR)/lib
 CC=gcc
 CFLAGS=-O0 -std=c99 -Wall -Werror -I$(INCLUDE_DIR) -fPIC -g3
 INCLUDE_DIR:=$(ROOT_DIR)/include
-export ROOT_DIR LIB_DIR INCLUDE_DIR CC CFLAGS SYS_CALL_TABLE_ADDRESS SYS_CALL_NUMBER
+export ROOT_DIR LIB_DIR INCLUDE_DIR CC CFLAGS SYS_CALL_TABLE_ADDRESS SYS_CALL_NUMBER CANARY_GROUP_SIZE
 
 all:
 	${MAKE} -C src/heapsentryu

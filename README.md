@@ -1,6 +1,12 @@
-## Commands:
-To compile: `$ make` <br/>
-To install: `$ make install`
+## Instructions:
+Run `$sudo cat /boot/System.map-3.13.0-61-generic | grep sys_call_table` <br/>
+Use value of `ia32_sys_call_table` for `SYS_CALL_TABLE_ADDRESS` in root `Makefile`. <br/>
+Compile using `$ make`. <br/>
+Insert the kernel module using `sudo insmod src/heapsentryk/heapsentryk.ko` <br/>
+Test the library using `./run.sh` <br/>
+See kernel logs using `tail -f /var/log/syslog` or `dmesg`. <br/>
+Note: Remove the kernel module using `sudo rmmod heapsentryk` <br/>
+
 
 ## Project Description:
 Course project for CSE509:System Security. (Fall 2015)

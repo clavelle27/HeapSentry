@@ -18,6 +18,11 @@ int main(int argc, char *argv[], char *envp[]){
 	int* a = (int*) malloc(10);
 	//printf("malloc returned: %p\n",a);
 	*a = 10;
+	a = (int*) malloc(10);
+	a = (int*) malloc(10);
+	a = (int*) malloc(10);
+	a = (int*) malloc(10);
+	a = (int*) malloc(10);
 	//printf("value of a(before):%d\n",*a);
 	//printf("Calling free():\n");
 	free(a);

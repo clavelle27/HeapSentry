@@ -14,7 +14,7 @@ MODULE_LICENSE("GPL");
 //
 // x86_64: sys_call_table
 // #define SYS_CALL_TABLE_ADDRESS 0xffffffff81801400
- 
+
 // Address of ia32_sys_call_table. with x86_64 table address, `int $0x80` did not work.
 // Ideally, `syscall` should be used with a recompiled kernel having a new system
 // call added. However, since the goal is just to introduce a communication channel
@@ -29,7 +29,9 @@ MODULE_LICENSE("GPL");
 // numbers. These are placeholders (I guess), for new calls and the array is not completely
 // filled up. One such `hole` is in the range 279-1023. So, using 280 here. This is the
 // system call number which userspace needs to invoke to reach heapsentryk's system call.
-#define SYS_SENTRY 280 
+// #define SYS_CALL_NUMBER 280
+//
+// This comes from makefile now to make it configurable.
 
 void **sys_call_table;
 
@@ -40,16 +42,19 @@ asmlinkage void *(*original_mmap) (void *addr, size_t length, int prot,
 asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
 				  int flags, int fd, off_t offset);
 asmlinkage int (*original_munmap) (void *addr, size_t length);
+asmlinkage void (*original_exit) (int status);
 asmlinkage int heapsentryk_munmap(void *addr, size_t length);
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 
 // System call which receives the canary information from heapsentryu
 // and stores it in its symbol table. This information is used by
 // high-risk calls to verify the canaries.
-asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3){
-	int* canary_location = (int*) v2;
-	int canary = (int) v3;
-	printk("heapsentryk:received: canary_location:[%p] canary:[%d]\n",canary_location,canary);
+asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
+{
+	int *canary_location = (int *)v2;
+	int canary = (int)v3;
+	printk("heapsentryk:received: canary_location:[%p] canary:[%d]\n",
+	       canary_location, canary);
 	// TODO: Change the parameters to receive the canary information in bulk.
 	// This bulk count will be user configurable in the userspace.
 	// 
@@ -97,12 +102,9 @@ static int __init mod_entry_func(void)
 	// original syscalls.
 	sys_call_table[__NR_mmap] = heapsentryk_mmap;
 	sys_call_table[__NR_munmap] = heapsentryk_munmap;
-	
-	printk("SYS_SENTRY:%d\n",SYS_SENTRY);
-	printk("Value present at sys_call_table[SYS_SENTRY]before:%p\n",sys_call_table[SYS_SENTRY]);
-	sys_call_table[SYS_SENTRY] = sys_heapsentryk_canary;
-	printk("Value present at sys_call_table[SYS_SENTRY]after:%p\n",sys_call_table[SYS_SENTRY]);
-	
+
+	// Setting HeapSentry system call to sys_call_table to the configured index.
+	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
 
 	return 0;
 }
@@ -114,10 +116,7 @@ static void __exit mod_exit_func(void)
 	// Restoring the original addresses of the system calls in the table.
 	sys_call_table[__NR_mmap] = original_mmap;
 	sys_call_table[__NR_munmap] = original_munmap;
-
-	//TODO: Do not set this to NULL.
-	// Cache the initial value above and then reset it back here.
-	sys_call_table[SYS_SENTRY] = 0;
+	sys_call_table[SYS_CALL_NUMBER] = 0;
 
 	printk(KERN_INFO "heapsentryk exiting...\n");
 }

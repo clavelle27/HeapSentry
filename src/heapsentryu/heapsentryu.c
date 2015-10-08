@@ -4,6 +4,8 @@
 #define __USE_GNU
 #include <dlfcn.h>
 
+static int group_count = 0;
+size_t *group_buffer;
 // These are the function pointers used to hold the address of 
 // actual system calls. The syntax of these function pointers
 // should precisely match with the syntax of real system calls.
@@ -11,7 +13,7 @@ typedef void *(*real_malloc) (size_t size);
 typedef void (*real_free) (void *ptr);
 
 // The function which invokes the HeapSentry's system call.
-size_t sys_canary(int* canary_location, int canary);
+size_t sys_canary(int *canary_location, int canary);
 
 // If this library is preloaded before any binary execution, then
 // this malloc() will be invoked, instead of stdlib malloc().
@@ -24,7 +26,6 @@ size_t sys_canary(int* canary_location, int canary);
 // provided name.
 void *malloc(size_t size)
 {
-
 	// Determine the function pointer of libc malloc().
 	real_malloc rmalloc = (real_malloc) dlsym(RTLD_NEXT, "malloc");
 
@@ -33,32 +34,46 @@ void *malloc(size_t size)
 	size_t modified_size = size + sizeof(int);
 
 	// Requesting malloc to allocate space for an extra integer along with `size` bytes.
-	char *obj = (char*)rmalloc(modified_size);
-	
-	// Determining the canary location to store the random number and casting it to int*.
-	int *canary_location = (int*) (obj + size);
+	char *obj = (char *)rmalloc(modified_size);
 
+	// Determining the canary location to store the random number and casting it to int*.
+	int *canary_location = (int *)(obj + size);
 
 	// Setting the seed for random number generation. If the seed is known,
 	// then the random numbers can be reproduced in the same sequence, since
 	// this is a pseudo-random number generator. Hence, setting a new seed
 	// everytime, so it cannot be reproduced again, and the number generated
 	// is fresh.
-	srand(time(NULL));
+	srand(rand());
 
 	// Generating a random number and casting it to size of int.
-	int canary = (int) rand();
+	int canary = (int)rand();
 
 	// Saving the canary at its designated location.
 	*canary_location = canary;
 
-
 	// TODO: Fill up an array (probably) of size configured by user and pass it
 	// to kernel when it gets filled.
-	
-	size_t ret = sys_canary(canary_location, canary);
-	printf("SYS_sentry returned: %ld\n",ret);
-	
+	if (!group_buffer) {
+		group_buffer =
+		    (size_t *) rmalloc(CANARY_GROUP_SIZE * 2 * sizeof(size_t));
+	}
+	*(group_buffer + group_count * 2) = (size_t) canary_location;
+	*(group_buffer + group_count * 2 + 1) = (size_t) canary;
+	printf("group_buffer[%d][0]: %d\n", group_count,
+	       (int)*(group_buffer + group_count * 2));
+	printf("group_buffer[%d][1]: %d\n", group_count,
+	       (int)*(group_buffer + group_count * 2 + 1));
+	group_count++;
+	printf("group_buffer: %p\n", group_buffer);
+
+	size_t ret = -1;
+	if (group_count == CANARY_GROUP_SIZE) {
+		ret = sys_canary(canary_location, canary);
+		group_count = 0;
+	}
+	printf("SYS_sentry returned: %ld\n", ret);
+
 	return obj;
 }
 
@@ -77,19 +92,18 @@ void free(void *ptr)
 	return rfree(ptr);
 }
 
-size_t sys_canary(int* canary_location, int canary){
+size_t sys_canary(int *canary_location, int canary)
+{
 	size_t r = -1;
-	size_t n = (size_t)SYS_CALL_NUMBER;
-	printf("libheapsentryu:sending: canary_location:[%p] canary:[%d]\n",canary_location,canary);
+	size_t n = (size_t) SYS_CALL_NUMBER;
+	printf("libheapsentryu:sending: canary_location:[%p] canary:[%d]\n",
+	       canary_location, canary);
 	// Below instruction puts the input parameter in rdx, system call
 	// number in rax and triggers an interrupt.
 	//
 	// The output parameter is stored into the variable 'r' via rax.
-	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n), "D"((size_t)canary_location), "S"(n), "d" ((size_t)canary):"cc", "memory");
+	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
+			     "D"((size_t) canary_location), "S"(n),
+			     "d"((size_t) canary):"cc", "memory");
 	return r;
 }
-
-
-
-
-
