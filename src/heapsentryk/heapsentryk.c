@@ -51,10 +51,15 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 // high-risk calls to verify the canaries.
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 {
-	int *canary_location = (int *)v2;
-	int canary = (int)v3;
-	printk("heapsentryk:received: canary_location:[%p] canary:[%d]\n",
-	       canary_location, canary);
+	size_t *group_buffer = (size_t *)v2;
+	size_t group_count = (size_t)v3;
+	int i = 0;
+	printk("heapsentryk:received: group_buffer:[%p] group_count:[%ld]\n",
+	       group_buffer, group_count);
+	for (i = 0; i < group_count; i++) {
+		printk("buf[%d][0]:[%p] buf[%d][1]:[%ld] deref:[%d]\n", i, (void *)*(group_buffer + i * 2),i,
+		       *(group_buffer + i * 2 + 1), *((int*)*(group_buffer + i * 2)));
+	}
 	// TODO: Change the parameters to receive the canary information in bulk.
 	// This bulk count will be user configurable in the userspace.
 	// 
@@ -68,8 +73,8 @@ asmlinkage int heapsentryk_munmap(void *addr, size_t length)
 	return original_munmap(addr, length);
 }
 
-asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
-				  int flags, int fd, off_t offset)
+asmlinkage void *heapsentryk_mmap(void *addr, size_t length,
+				  int prot, int flags, int fd, off_t offset)
 {
 	//printk("KERN_INFO Entered heapsentryk_mmap()\n");
 	return original_mmap(addr, length, prot, flags, fd, offset);
@@ -83,10 +88,8 @@ static int __init mod_entry_func(void)
 
 	// Setting the address of the system call table here.
 	sys_call_table = (void *)SYS_CALL_TABLE_ADDRESS;
-
 	// Giving write permissions to the page containing this table.
 	set_read_write(SYS_CALL_TABLE_ADDRESS);
-
 	// Caching the original addresses of mmap() and munmap() system calls.
 	// These place holders in the table will be changed to hold the addresses
 	// of heapsentryk's mmap() and munmap().
@@ -95,17 +98,14 @@ static int __init mod_entry_func(void)
 	// module in unloaded.
 	original_mmap = sys_call_table[__NR_mmap];
 	original_munmap = sys_call_table[__NR_munmap];
-
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
 	// actions. Either exiting the process or letting the request through to
 	// original syscalls.
 	sys_call_table[__NR_mmap] = heapsentryk_mmap;
 	sys_call_table[__NR_munmap] = heapsentryk_munmap;
-
 	// Setting HeapSentry system call to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
-
 	return 0;
 }
 
@@ -117,7 +117,6 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_mmap] = original_mmap;
 	sys_call_table[__NR_munmap] = original_munmap;
 	sys_call_table[SYS_CALL_NUMBER] = 0;
-
 	printk(KERN_INFO "heapsentryk exiting...\n");
 }
 

@@ -13,7 +13,7 @@ typedef void *(*real_malloc) (size_t size);
 typedef void (*real_free) (void *ptr);
 
 // The function which invokes the HeapSentry's system call.
-size_t sys_canary(int *canary_location, int canary);
+size_t sys_canary(size_t *group_buffer, size_t group_count);
 
 // If this library is preloaded before any binary execution, then
 // this malloc() will be invoked, instead of stdlib malloc().
@@ -65,14 +65,11 @@ void *malloc(size_t size)
 	printf("group_buffer[%d][1]: %d\n", group_count,
 	       (int)*(group_buffer + group_count * 2 + 1));
 	group_count++;
-	printf("group_buffer: %p\n", group_buffer);
 
-	size_t ret = -1;
 	if (group_count == CANARY_GROUP_SIZE) {
-		ret = sys_canary(canary_location, canary);
+		sys_canary(group_buffer, group_count);
 		group_count = 0;
 	}
-	printf("SYS_sentry returned: %ld\n", ret);
 
 	return obj;
 }
@@ -92,18 +89,18 @@ void free(void *ptr)
 	return rfree(ptr);
 }
 
-size_t sys_canary(int *canary_location, int canary)
+size_t sys_canary(size_t *group_buffer, size_t group_count)
 {
 	size_t r = -1;
 	size_t n = (size_t) SYS_CALL_NUMBER;
-	printf("libheapsentryu:sending: canary_location:[%p] canary:[%d]\n",
-	       canary_location, canary);
+	printf("libheapsentryu:sending: canary_location:[%p] canary:[%ld]\n",
+	       group_buffer, group_count);
 	// Below instruction puts the input parameter in rdx, system call
 	// number in rax and triggers an interrupt.
 	//
 	// The output parameter is stored into the variable 'r' via rax.
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
-			     "D"((size_t) canary_location), "S"(n),
-			     "d"((size_t) canary):"cc", "memory");
+			     "D"((size_t) group_buffer), "S"(n),
+			     "d"((size_t) group_count):"cc", "memory");
 	return r;
 }
