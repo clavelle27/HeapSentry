@@ -9,19 +9,21 @@
 // should precisely match with the syntax of real system calls.
 typedef void *(*real_malloc) (size_t size);
 typedef void (*real_free) (void *ptr);
-size_t sys_canary(int a1);
+
+// The function which invokes the HeapSentry's system call.
+size_t sys_canary(int* canary_location, int canary);
 
 // If this library is preloaded before any binary execution, then
-// this malloc() will be invoked instead of stdlib malloc(). After
-// performing the actions to be taken in this method, the address
+// this malloc() will be invoked, instead of stdlib malloc().
+// 
+// After performing the actions to be taken in this method, the address
 // of real malloc() is determined and invoked.
 //
-//  Address of real malloc() is determined using libdl. RTLD_NEXT
-//  indicates dlsym() to find for the next symbol that goes by the
-//  provided name.
+// Address of real malloc() is determined using libdl. RTLD_NEXT
+// indicates dlsym() to find for the next symbol that goes by the
+// provided name.
 void *malloc(size_t size)
 {
-	printf("malloc from libheapsentryu called.\n");
 
 	// Determine the function pointer of libc malloc().
 	real_malloc rmalloc = (real_malloc) dlsym(RTLD_NEXT, "malloc");
@@ -35,25 +37,27 @@ void *malloc(size_t size)
 	
 	// Determining the canary location to store the random number and casting it to int*.
 	int *canary_location = (int*) (obj + size);
-	printf("canary_location: %p\n",canary_location);
+
 
 	// Setting the seed for random number generation. If the seed is known,
 	// then the random numbers can be reproduced in the same sequence, since
-	// this is a pseudo-random number generator.
-	// 
-	// Hence, setting a new seed everytime, so it cannot be reproduced again,
-	// and the number generated is not reproducible and fresh.
+	// this is a pseudo-random number generator. Hence, setting a new seed
+	// everytime, so it cannot be reproduced again, and the number generated
+	// is fresh.
 	srand(time(NULL));
 
 	// Generating a random number and casting it to size of int.
 	int canary = (int) rand();
 
+	// Saving the canary at its designated location.
 	*canary_location = canary;
-	printf("canary: %d\n",*canary_location);
+
 
 	// TODO: Fill up an array (probably) of size configured by user and pass it
 	// to kernel when it gets filled.
-	sys_canary(10);
+	
+	size_t ret = sys_canary(canary_location, canary);
+	printf("SYS_sentry returned: %ld\n",ret);
 	
 	return obj;
 }
@@ -73,13 +77,15 @@ void free(void *ptr)
 	return rfree(ptr);
 }
 
-size_t sys_canary(int a1){
+size_t sys_canary(int* canary_location, int canary){
 	size_t r = -1;
-	// TODO: Set the value of N from a macro value passed from makefile.
-	// Use similar approach to set the system call number in kernel.
 	size_t n = 280;
-	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n), "D"((size_t)a1):"cc", "memory");
-	printf("SYS_sentry returned: %ld\n",r);
+	printf("libheapsentryu:sending: canary_location:[%p] canary:[%d]\n",canary_location,canary);
+	// Below instruction puts the input parameter in rdx, system call
+	// number in rax and triggers an interrupt.
+	//
+	// The output parameter is stored into the variable 'r' via rax.
+	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n), "D"((size_t)canary_location), "S"(n), "d" ((size_t)canary):"cc", "memory");
 	return r;
 }
 

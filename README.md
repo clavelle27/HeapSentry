@@ -1,6 +1,6 @@
-## Instructions:
-`make` compile
-`make install` for installation
+## Commands:
+To compile: `$ make` <br/>
+To install: `$ make install`
 
 ## Project Description:
 Course project for CSE509:System Security. (Fall 2015)

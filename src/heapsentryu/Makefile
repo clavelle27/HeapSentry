@@ -1,5 +1,3 @@
-CC=gcc
-CFLAGS=-O0 -std=c99 -Wall -Werror -I$(INCLUDE_DIR) -fPIC -g3 
 LIBS=-ldl
 SRCS:=$(shell find . -name \*.c)
 

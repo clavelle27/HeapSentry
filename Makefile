@@ -6,8 +6,10 @@
 # variables, non-modifiable.
 ROOT_DIR:=$(shell pwd)
 LIB_DIR:=$(ROOT_DIR)/lib
+CC=gcc
+CFLAGS=-O0 -std=c99 -Wall -Werror -I$(INCLUDE_DIR) -fPIC -g3 
 INCLUDE_DIR:=$(ROOT_DIR)/include
-export ROOT_DIR LIB_DIR INCLUDE_DIR
+export ROOT_DIR LIB_DIR INCLUDE_DIR CC CFLAGS
 
 all:
 	${MAKE} -C src/heapsentryu

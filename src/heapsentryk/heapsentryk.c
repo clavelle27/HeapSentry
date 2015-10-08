@@ -8,23 +8,23 @@ MODULE_LICENSE("GPL");
 // kernels. This address can be dynamically found out (with some effort).
 // For the purposes of this project, however, it is not required.
 //
-// This value can be found by running the following command at the prompt.
+// This value is found by running the following command at the prompt.
 // $sudo cat /boot/System.map-3.13.0-61-generic | grep sys_call_table
 // The suffix after "System.map-" should be the result of "$uname -r".
 //
-//x86_64 sys_call_table
-//#define SYS_CALL_TABLE_ADDRESS 0xffffffff81801400
-// 
-// Address of ia32_sys_call_table. In x86_64 machine, `int $0x80` did not work.
+// x86_64: sys_call_table
+// #define SYS_CALL_TABLE_ADDRESS 0xffffffff81801400
+ 
+// Address of ia32_sys_call_table. with x86_64 table address, `int $0x80` did not work.
 // Ideally, `syscall` should be used with a recompiled kernel having a new system
 // call added. However, since the goal is just to introduce a communication channel
 // between heapsentryu and heapsentryk, 32 bit sys_call_table is used in this module.
-//ia-32 ia32_sys_call_table
+// ia-32: ia32_sys_call_table
 #define SYS_CALL_TABLE_ADDRESS 0xffffffff81809ca0
 
 // Look into /usr/include/asm-generic/unistd.h for all the system call numbers.
 // The array holding function pointers to system calls in kernel is indexed by these
-// numbers. There are placeholders (I guess) for new calls and the array is not completely
+// numbers. These are placeholders (I guess), for new calls and the array is not completely
 // filled up. One such `hole` is in the range 279-1023. So, using 280 here. This is the
 // system call number which userspace needs to invoke to reach heapsentryk's system call.
 #define SYS_SENTRY 280 
@@ -39,13 +39,15 @@ asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
 				  int flags, int fd, off_t offset);
 asmlinkage int (*original_munmap) (void *addr, size_t length);
 asmlinkage int heapsentryk_munmap(void *addr, size_t length);
-asmlinkage size_t sys_heapsentryk_canary(size_t length);
+asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 
 // System call which receives the canary information from heapsentryu
 // and stores it in its symbol table. This information is used by
 // high-risk calls to verify the canaries.
-asmlinkage size_t sys_heapsentryk_canary(size_t length){
-	printk("Entering sys_heapsentryk_canary\n");
+asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3){
+	int* canary_location = (int*) v2;
+	int canary = (int) v3;
+	printk("heapsentryk:received: canary_location:[%p] canary:[%d]\n",canary_location,canary);
 	// TODO: Change the parameters to receive the canary information in bulk.
 	// This bulk count will be user configurable in the userspace.
 	// 
