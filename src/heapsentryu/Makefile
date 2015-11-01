@@ -4,6 +4,7 @@ SRCS:=$(shell find . -name \*.c)
 .PHONY: libheapsentryu clean
 
 libheapsentryu: $(SRCS:%.c=%.o) 
+	@mkdir -p ../../lib
 	$(CC) -shared -o ../../lib/$@.so $^ $(LIBS)
 
 %.o: %.c
