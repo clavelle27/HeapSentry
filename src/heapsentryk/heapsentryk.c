@@ -1,11 +1,21 @@
 #include <linux/module.h>
 #include <linux/unistd.h>
+#include <linux/hashtable.h>
 
 MODULE_LICENSE("GPL");
+
+// Hashtable to store canary information
+DEFINE_HASHTABLE(buckets, 20);
 
 void **sys_call_table;
 
 void set_read_write(long unsigned int _addr);
+
+struct canary_entry {
+	size_t canary_location;
+	size_t canary_value;
+	struct hlist_node * next;
+};
 
 asmlinkage void *(*original_mmap) (void *addr, size_t length, int prot,
 				   int flags, int fd, off_t offset);
@@ -55,6 +65,19 @@ asmlinkage void *heapsentryk_mmap(void *addr, size_t length,
 // loaded into the kernel.
 static int __init mod_entry_func(void)
 {
+	int bucket_index;
+	struct canary_entry *p_canary_entry;
+	struct canary_entry entry1;
+	struct canary_entry entry2;
+
+	printk(KERN_INFO "bucket_index:%d p_canary_entry:%p\n",bucket_index,  p_canary_entry);
+	entry1.canary_location = 123;
+	entry1.canary_value = 45;
+	entry1.next = NULL;
+	entry2.canary_location = 678;
+	entry2.canary_value = 90;
+	entry2.next = NULL;
+
 	//printk(KERN_INFO "heapsentryk entering...\n");
 
 	// Setting the address of the system call table here.
@@ -77,6 +100,20 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_munmap] = heapsentryk_munmap;
 	// Setting HeapSentry system call to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
+
+
+	// Initialization of Hashtable
+	hash_init(buckets);
+
+	hash_add(buckets, entry1.next, entry1.canary_location);
+	hash_add(buckets, entry2.next, entry2.canary_location);
+
+/*
+	hash_for_each(buckets, bucket_index, p_canary_entry, next){
+		printk(KERN_INFO "data=%d is in bucket %d\n", current->data, bkt);
+	}
+*/
+
 	return 0;
 }
 
