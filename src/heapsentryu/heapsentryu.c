@@ -4,8 +4,8 @@
 #define __USE_GNU
 #include <dlfcn.h>
 
-static int group_count = 0;
-size_t *group_buffer;
+size_t *p_group_buffer;
+size_t *p_group_count = 0;
 // These are the function pointers used to hold the address of 
 // actual system calls. The syntax of these function pointers
 // should precisely match with the syntax of real system calls.
@@ -13,7 +13,7 @@ typedef void *(*real_malloc) (size_t size);
 typedef void (*real_free) (void *ptr);
 
 // The function which invokes the HeapSentry's system call.
-size_t sys_canary(size_t *group_buffer, size_t group_count);
+size_t sys_canary();
 
 // If this library is preloaded before any binary execution, then
 // this malloc() will be invoked, instead of stdlib malloc().
@@ -54,21 +54,24 @@ void *malloc(size_t size)
 
 	// TODO: Fill up an array (probably) of size configured by user and pass it
 	// to kernel when it gets filled.
-	if (!group_buffer) {
-		group_buffer =
+	if (!p_group_buffer) {
+		p_group_buffer =
 		    (size_t *) rmalloc(CANARY_GROUP_SIZE * 2 * sizeof(size_t));
 	}
-	*(group_buffer + group_count * 2) = (size_t) canary_location;
-	*(group_buffer + group_count * 2 + 1) = (size_t) canary;
-	printf("group_buffer[%d][0]: %d\n", group_count,
-	       (int)*(group_buffer + group_count * 2));
-	printf("group_buffer[%d][1]: %d\n", group_count,
-	       (int)*(group_buffer + group_count * 2 + 1));
-	group_count++;
+	if (!p_group_count) {
+		p_group_count = (size_t *) rmalloc(sizeof(size_t));
+	}
+	*(p_group_buffer + *p_group_count * 2) = (size_t) canary_location;
+	*(p_group_buffer + *p_group_count * 2 + 1) = (size_t) canary;
+	printf("p_group_buffer[%ld][0]: %d\n", *p_group_count,
+	       (int)*(p_group_buffer + *p_group_count * 2));
+	printf("p_group_buffer[%ld][1]: %d\n", *p_group_count,
+	       (int)*(p_group_buffer + *p_group_count * 2 + 1));
+	(*p_group_count)++;
 
-	if (group_count == CANARY_GROUP_SIZE) {
-		sys_canary(group_buffer, group_count);
-		group_count = 0;
+	if (*p_group_count == CANARY_GROUP_SIZE) {
+		sys_canary();
+		*p_group_count = 0;
 	}
 
 	return obj;
@@ -89,18 +92,18 @@ void free(void *ptr)
 	return rfree(ptr);
 }
 
-size_t sys_canary(size_t *group_buffer, size_t group_count)
+size_t sys_canary()
 {
 	size_t r = -1;
 	size_t n = (size_t) SYS_CALL_NUMBER;
-	printf("libheapsentryu:sending: canary_location:[%p] canary:[%ld]\n",
-	       group_buffer, group_count);
+	printf("libheapsentryu:sending: p_group_buffer:[%p] p_group_count:[%p] *p_group_count:[%ld]\n",
+	       p_group_buffer, p_group_count, *p_group_count);
 	// Below instruction puts the input parameter in rdx, system call
 	// number in rax and triggers an interrupt.
 	//
 	// The output parameter is stored into the variable 'r' via rax.
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
-			     "D"((size_t) group_buffer), "S"(n),
-			     "d"((size_t) group_count):"cc", "memory");
+			     "D"((size_t) p_group_buffer), "S"(n),
+			     "d"((size_t) p_group_count):"cc", "memory");
 	return r;
 }

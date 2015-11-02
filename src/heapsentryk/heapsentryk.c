@@ -3,36 +3,6 @@
 
 MODULE_LICENSE("GPL");
 
-// The value of this variable differs in each machine. For security
-// reasons, the value of the sys_call_table is not exported in contemporary
-// kernels. This address can be dynamically found out (with some effort).
-// For the purposes of this project, however, it is not required.
-//
-// This value is found by running the following command at the prompt.
-// $sudo cat /boot/System.map-3.13.0-61-generic | grep sys_call_table
-// The suffix after "System.map-" should be the result of "$uname -r".
-//
-// x86_64: sys_call_table
-// #define SYS_CALL_TABLE_ADDRESS 0xffffffff81801400
-
-// Address of ia32_sys_call_table. with x86_64 table address, `int $0x80` did not work.
-// Ideally, `syscall` should be used with a recompiled kernel having a new system
-// call added. However, since the goal is just to introduce a communication channel
-// between heapsentryu and heapsentryk, 32 bit sys_call_table is used in this module.
-// ia-32: ia32_sys_call_table
-// #define SYS_CALL_TABLE_ADDRESS 0xffffffff81809ca0
-//
-// Note: This value now comes from makefile to make it configurable.
-
-// Look into /usr/include/asm-generic/unistd.h for all the system call numbers.
-// The array holding function pointers to system calls in kernel is indexed by these
-// numbers. These are placeholders (I guess), for new calls and the array is not completely
-// filled up. One such `hole` is in the range 279-1023. So, using 280 here. This is the
-// system call number which userspace needs to invoke to reach heapsentryk's system call.
-// #define SYS_CALL_NUMBER 280
-//
-// This comes from makefile now to make it configurable.
-
 void **sys_call_table;
 
 void set_read_write(long unsigned int _addr);
@@ -51,14 +21,15 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 // high-risk calls to verify the canaries.
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 {
-	size_t *group_buffer = (size_t *)v2;
-	size_t group_count = (size_t)v3;
-	int i = 0;
-	printk("heapsentryk:received: group_buffer:[%p] group_count:[%ld]\n",
-	       group_buffer, group_count);
-	for (i = 0; i < group_count; i++) {
-		printk("buf[%d][0]:[%p] buf[%d][1]:[%ld] deref:[%d]\n", i, (void *)*(group_buffer + i * 2),i,
-		       *(group_buffer + i * 2 + 1), *((int*)*(group_buffer + i * 2)));
+	size_t *p_group_buffer = (size_t *)v2;
+	size_t *p_group_count = (size_t *)v3;
+	size_t i = 0;
+	printk("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
+	       p_group_buffer, p_group_count);
+	printk("heapsentryk: dereferencing p_group_count:[%ld]\n",*p_group_count);
+	for (i = 0; i < *p_group_count; i++) {
+		printk("buf[%ld][0]:[%p] buf[%ld][1]:[%ld] deref:[%ld]\n", i, (void *)*(p_group_buffer + i * 2),i,
+		       *(p_group_buffer + i * 2 + 1), *((size_t*)*(p_group_buffer + i * 2)));
 	}
 	// TODO: Change the parameters to receive the canary information in bulk.
 	// This bulk count will be user configurable in the userspace.
