@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 // This is just a test binary. Here, actual malloc() and free()
 // functions are invoked. If libheapsentryu is preloaded, then
@@ -13,6 +14,7 @@
 // binary finds symbols from libheapsentryu, for malloc() and
 // free(), before it finds the symbols from stdlib.
 int main(int argc, char *argv[], char *envp[]){
+	printf("Entering libtest\n");
 	//printf("sizeof(int): %ld\n",sizeof(int));
 	//printf("Calling malloc():\n");
 	int* a = (int*) malloc(10);
@@ -27,6 +29,6 @@ int main(int argc, char *argv[], char *envp[]){
 	//printf("Calling free():\n");
 	free(a);
 	//printf("value of a(after):%d\n",*a);
-	FILE* fp = fopen("file.txt", "w+");
-	fclose(fp);
+	fork();
+	printf("Exiting libtest\n");
 }

@@ -62,9 +62,9 @@ void *malloc(size_t size)
 	}
 	*(p_group_buffer + *p_group_count * 2) = (size_t) canary_location;
 	*(p_group_buffer + *p_group_count * 2 + 1) = (size_t) canary;
-	printf("p_group_buffer[%ld][0]: %d\n", *p_group_count,
+	printf("p_group_buffer[%d][0]: %d\n", *p_group_count,
 	       (int)*(p_group_buffer + *p_group_count * 2));
-	printf("p_group_buffer[%ld][1]: %d\n", *p_group_count,
+	printf("p_group_buffer[%d][1]: %d\n", *p_group_count,
 	       (int)*(p_group_buffer + *p_group_count * 2 + 1));
 	(*p_group_count)++;
 
@@ -95,7 +95,7 @@ size_t sys_canary()
 {
 	size_t r = -1;
 	size_t n = (size_t) SYS_CALL_NUMBER;
-	printf("libheapsentryu:sending: p_group_buffer:[%p] p_group_count:[%p] *p_group_count:[%ld]\n",
+	printf("libheapsentryu:sending: p_group_buffer:[%p] p_group_count:[%p] *p_group_count:[%d]\n",
 	       p_group_buffer, p_group_count, *p_group_count);
 	// Below instruction puts the input parameter in rdx, system call
 	// number in rax and triggers an interrupt.

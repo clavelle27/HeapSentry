@@ -53,7 +53,7 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 	size_t i = 0;
 	printk("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
 	       p_group_buffer, p_group_count);
-	printk("heapsentryk: dereferencing p_group_count:[%ld]\n",*p_group_count);
+	printk("heapsentryk: dereferencing p_group_count:[%d]\n",*p_group_count);
 	for (i = 0; i < *p_group_count; i++) {
 		// Allocate an object to store in Hash table that persists beyond the scope of this function.
 		entry = (struct canary_entry *) kmalloc(sizeof(struct canary_entry), GFP_KERNEL);
@@ -61,13 +61,13 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 		entry->canary_location = *(p_group_buffer + i * 2);
 		entry->canary_value = *((size_t*)*(p_group_buffer + i * 2));
 		hash_add(buckets, &entry->next, entry->canary_location);
-		printk("buf[%ld][0]:[%p] buf[%ld][1]:[%ld] deref:[%ld]\n", i, (void *)*(p_group_buffer + i * 2),i,
+		printk("buf[%d][0]:[%p] buf[%d][1]:[%d] deref:[%d]\n", i, (void *)*(p_group_buffer + i * 2),i,
 		       *(p_group_buffer + i * 2 + 1), *((size_t*)*(p_group_buffer + i * 2)));
 	}
 
 	printk("Hashtable iteration started\n");
 	hash_for_each(buckets, bucket_index, p_canary_entry, next){
-		printk(KERN_INFO "canary_location=%ld canary_value=%ld deref=%ld is in bucket %d\n", p_canary_entry->canary_location, p_canary_entry->canary_value, *((size_t*)p_canary_entry->canary_location),bucket_index);
+		printk(KERN_INFO "canary_location=%d canary_value=%d deref=%d is in bucket %d\n", p_canary_entry->canary_location, p_canary_entry->canary_value, *((size_t*)p_canary_entry->canary_location),bucket_index);
 	}
 	printk("Hashtable iteration ended\n");
 
@@ -80,7 +80,7 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 
 asmlinkage int heapsentryk_execve(const char* filename, char *const argv[], char *const envp[])
 {
-	//printk(KERN_INFO "Entered heapsentryk_execve()\n");
+	printk(KERN_INFO "Entered heapsentryk_execve()\n");
 	return original_execve(filename, argv, envp);
 }
 
@@ -92,7 +92,7 @@ asmlinkage int heapsentryk_open (const char *pathname, int flags, int mode)
 
 asmlinkage int heapsentryk_fork (void)
 {
-	//printk(KERN_INFO "Entered heapsentryk_fork()\n");
+	printk(KERN_INFO "Entered heapsentryk_fork()\n");
 	return original_fork();
 }
 
@@ -111,7 +111,7 @@ asmlinkage int heapsentryk_munmap(void *addr, size_t length)
 asmlinkage void *heapsentryk_mmap(void *addr, size_t length,
 				  int prot, int flags, int fd, off_t offset)
 {
-	//printk("KERN_INFO Entered heapsentryk_mmap()\n");
+	printk("KERN_INFO Entered heapsentryk_mmap()\n");
 	return original_mmap(addr, length, prot, flags, fd, offset);
 }
 
@@ -136,6 +136,8 @@ static int __init mod_entry_func(void)
 	original_munmap = sys_call_table[__NR_munmap];
 	original_execve = sys_call_table[__NR_execve];
 	original_open = sys_call_table[__NR_open];
+	original_fork = sys_call_table[__NR_fork];
+	original_chmod = sys_call_table[__NR_chmod];
 
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
