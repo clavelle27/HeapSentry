@@ -14,7 +14,7 @@ void set_read_write(long unsigned int _addr);
 struct canary_entry {
 	size_t canary_location;
 	size_t canary_value;
-	struct hlist_node * next;
+	struct hlist_node next;
 };
 
 asmlinkage void *(*original_mmap) (void *addr, size_t length, int prot,
@@ -73,10 +73,10 @@ static int __init mod_entry_func(void)
 	printk(KERN_INFO "bucket_index:%d p_canary_entry:%p\n",bucket_index,  p_canary_entry);
 	entry1.canary_location = 123;
 	entry1.canary_value = 45;
-	entry1.next = NULL;
+	//entry1.next = NULL;
 	entry2.canary_location = 678;
 	entry2.canary_value = 90;
-	entry2.next = NULL;
+	//entry2.next = NULL;
 
 	//printk(KERN_INFO "heapsentryk entering...\n");
 
@@ -105,14 +105,12 @@ static int __init mod_entry_func(void)
 	// Initialization of Hashtable
 	hash_init(buckets);
 
-	hash_add(buckets, entry1.next, entry1.canary_location);
-	hash_add(buckets, entry2.next, entry2.canary_location);
+	hash_add(buckets, &entry1.next, entry1.canary_location);
+	hash_add(buckets, &entry2.next, entry2.canary_location);
 
-/*
 	hash_for_each(buckets, bucket_index, p_canary_entry, next){
-		printk(KERN_INFO "data=%d is in bucket %d\n", current->data, bkt);
+		printk(KERN_INFO "canary_location=%ld canary_value=%ld is in bucket %d\n", p_canary_entry->canary_location, p_canary_entry->canary_value, bucket_index);
 	}
-*/
 
 	return 0;
 }
