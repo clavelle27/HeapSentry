@@ -15,6 +15,9 @@ typedef void (*real_free) (void *ptr);
 // The function which invokes the HeapSentry's system call.
 size_t sys_canary();
 
+// Initializes the random number generator
+void init_random();
+
 // If this library is preloaded before any binary execution, then
 // this malloc() will be invoked, instead of stdlib malloc().
 // 
@@ -39,12 +42,8 @@ void *malloc(size_t size)
 	// Determining the canary location to store the random number and casting it to int*.
 	int *canary_location = (int *)(obj + size);
 
-	// Setting the seed for random number generation. If the seed is known,
-	// then the random numbers can be reproduced in the same sequence, since
-	// this is a pseudo-random number generator. Hence, setting a new seed
-	// everytime, so it cannot be reproduced again, and the number generated
-	// is fresh.
-	srand(rand());
+	// Setting the seed for random number generation. This happens once per library load.
+    init_random();
 
 	// Generating a random number and casting it to size of int.
 	int canary = (int)rand();
@@ -107,3 +106,22 @@ size_t sys_canary()
 			     "d"((size_t) p_group_count):"cc", "memory");
 	return r;
 }
+
+// This function initializes the random number generator only ONCE per process
+// invocation. If we enter this library from another process or successive invocation
+// of same process, init_done will be zero again and srand init will happen again.
+// This makes sure we have fresh random numbers for every invocation of a process
+// Warning: There is still a window of upto 1sec where the same seq of random numbers 
+// are produced across process invocations. Cos time(NULL) will be the same within a
+// second.
+void init_random( void )
+{
+    static int init_done = 0;
+
+    if ( !init_done )
+    {
+        srand( time( NULL) );
+        init_done = 1;
+    }
+}
+
