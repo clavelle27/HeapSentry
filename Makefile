@@ -26,11 +26,13 @@ all:
 	${MAKE} -C src/heapsentryu
 	${MAKE} -C src/heapsentryk
 	${MAKE} -C src/libtest
+	${MAKE} -C test/funptroverwrite
 
 clean:
 	${MAKE} -C src/heapsentryu clean
 	${MAKE} -C src/heapsentryk clean
 	${MAKE} -C src/libtest clean
+	${MAKE} -C test/funptroverwrite clean
 
 install:
 	sudo mkdir -p /etc/heapsentry
