@@ -6,6 +6,8 @@
 
 MODULE_LICENSE("GPL");
 
+// Look for system call numbers in /usr/include/asm-generic/unistd.h
+
 // Hashtable to store canary information
 DEFINE_HASHTABLE(buckets, 20);
 
@@ -19,13 +21,23 @@ struct canary_entry {
 	struct hlist_node next;
 };
 
+asmlinkage int (*original_fork) (void);
+asmlinkage int (*original_chmod) (const char *pathname, int mode);
+asmlinkage int (*original_munmap) (void *addr, size_t length);
+asmlinkage int (*original_execve)(const char*, char *const argv[], char *const envp[]);
+asmlinkage int (*original_open) (const char *, int, int);
 asmlinkage void *(*original_mmap) (void *addr, size_t length, int prot,
 				   int flags, int fd, off_t offset);
+asmlinkage void (*original_exit) (int status);
+
 asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
 				  int flags, int fd, off_t offset);
-asmlinkage int (*original_munmap) (void *addr, size_t length);
-asmlinkage void (*original_exit) (int status);
 asmlinkage int heapsentryk_munmap(void *addr, size_t length);
+asmlinkage int heapsentryk_execve(const char*, char *const argv[], char *const envp[]);
+asmlinkage int heapsentryk_open (const char *, int, int);
+asmlinkage int heapsentryk_fork (void);
+asmlinkage int heapsentryk_chmod (const char *pathname, int mode);
+
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 
 // System call which receives the canary information from heapsentryu
@@ -66,6 +78,30 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 	return 30;
 }
 
+asmlinkage int heapsentryk_execve(const char* filename, char *const argv[], char *const envp[])
+{
+	//printk(KERN_INFO "Entered heapsentryk_execve()\n");
+	return original_execve(filename, argv, envp);
+}
+
+asmlinkage int heapsentryk_open (const char *pathname, int flags, int mode)
+{
+	//printk(KERN_INFO "Entered heapsentryk_open()\n");
+	return original_open(pathname, flags, mode);
+}
+
+asmlinkage int heapsentryk_fork (void)
+{
+	//printk(KERN_INFO "Entered heapsentryk_fork()\n");
+	return original_fork();
+}
+
+asmlinkage int heapsentryk_chmod (const char *pathname, int mode)
+{
+	//printk(KERN_INFO "Entered heapsentryk_chmod()\n");
+	return original_chmod(pathname, mode);
+}
+
 asmlinkage int heapsentryk_munmap(void *addr, size_t length)
 {
 	//printk(KERN_INFO "Entered heapsentryk_munmap()\n");
@@ -83,30 +119,37 @@ asmlinkage void *heapsentryk_mmap(void *addr, size_t length,
 // loaded into the kernel.
 static int __init mod_entry_func(void)
 {
-
-	//printk(KERN_INFO "heapsentryk entering...\n");
+	printk(KERN_INFO "heapsentryk entered!\n");
 
 	// Setting the address of the system call table here.
 	sys_call_table = (void *)SYS_CALL_TABLE_ADDRESS;
 	// Giving write permissions to the page containing this table.
 	set_read_write(SYS_CALL_TABLE_ADDRESS);
-	// Caching the original addresses of mmap() and munmap() system calls.
+
+	// Caching the original addresses of system calls.
 	// These place holders in the table will be changed to hold the addresses
-	// of heapsentryk's mmap() and munmap().
+	// of heapsentryk's overriden system calls.
 	//
 	// Table should be restored to contain its original addresses when this
 	// module in unloaded.
 	original_mmap = sys_call_table[__NR_mmap];
 	original_munmap = sys_call_table[__NR_munmap];
+	original_execve = sys_call_table[__NR_execve];
+	original_open = sys_call_table[__NR_open];
+
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
 	// actions. Either exiting the process or letting the request through to
 	// original syscalls.
 	sys_call_table[__NR_mmap] = heapsentryk_mmap;
 	sys_call_table[__NR_munmap] = heapsentryk_munmap;
+	sys_call_table[__NR_open] = heapsentryk_open;
+	sys_call_table[__NR_execve] = heapsentryk_execve;
+	sys_call_table[__NR_fork] = heapsentryk_fork;
+	sys_call_table[__NR_chmod] = heapsentryk_chmod;
+
 	// Setting HeapSentry system call to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
-
 
 	// Initialize the Hashtable to store the canary information.
 	hash_init(buckets);
@@ -121,6 +164,10 @@ static void __exit mod_exit_func(void)
 	// Restoring the original addresses of the system calls in the table.
 	sys_call_table[__NR_mmap] = original_mmap;
 	sys_call_table[__NR_munmap] = original_munmap;
+	sys_call_table[__NR_execve] = original_execve;
+	sys_call_table[__NR_open] = original_open;
+	sys_call_table[__NR_fork] = original_fork;
+	sys_call_table[__NR_chmod] = original_chmod;
 	sys_call_table[SYS_CALL_NUMBER] = 0;
 	printk(KERN_INFO "heapsentryk exiting...\n");
 }

@@ -6,7 +6,14 @@
 # variables, non-modifiable.
 
 CANARY_GROUP_SIZE:=5
-SYS_CALL_TABLE_ADDRESS:=0x$(shell sudo cat /boot/System.map-`uname -a | cut -d " " -f3` | grep ia32_sys_call_table | cut -d " " -f1 )
+SYS_CALL_TABLE_ADDRESS=0x$(shell sudo cat /boot/System.map-`uname -a | cut -d " " -f3` | grep ia32_sys_call_table | cut -d " " -f1 )
+
+#sys_call_table
+#SYS_CALL_TABLE_ADDRESS=0xffffffff81801460
+
+#ia32_sys_call_table
+#SYS_CALL_TABLE_ADDRESS=0xffffffff8180d2c0
+
 SYS_CALL_NUMBER:=280
 ROOT_DIR:=$(shell pwd)
 LIB_DIR:=$(ROOT_DIR)/lib

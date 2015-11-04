@@ -27,4 +27,6 @@ int main(int argc, char *argv[], char *envp[]){
 	//printf("Calling free():\n");
 	free(a);
 	//printf("value of a(after):%d\n",*a);
+	FILE* fp = fopen("file.txt", "w+");
+	fclose(fp);
 }
