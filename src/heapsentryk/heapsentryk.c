@@ -1,6 +1,8 @@
 #include <linux/module.h>
 #include <linux/unistd.h>
 #include <linux/hashtable.h>
+#include <linux/slab.h>
+#include <linux/string.h>
 
 MODULE_LICENSE("GPL");
 
@@ -31,6 +33,9 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 // high-risk calls to verify the canaries.
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 {
+	int bucket_index = 0;
+	struct canary_entry *p_canary_entry = NULL;
+	struct canary_entry *entry = NULL;
 	size_t *p_group_buffer = (size_t *)v2;
 	size_t *p_group_count = (size_t *)v3;
 	size_t i = 0;
@@ -38,9 +43,22 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 	       p_group_buffer, p_group_count);
 	printk("heapsentryk: dereferencing p_group_count:[%ld]\n",*p_group_count);
 	for (i = 0; i < *p_group_count; i++) {
+		// Allocate an object to store in Hash table that persists beyond the scope of this function.
+		entry = (struct canary_entry *) kmalloc(sizeof(struct canary_entry), GFP_KERNEL);
+		memset((void *)entry, 0, sizeof(struct canary_entry));
+		entry->canary_location = *(p_group_buffer + i * 2);
+		entry->canary_value = *((size_t*)*(p_group_buffer + i * 2));
+		hash_add(buckets, &entry->next, entry->canary_location);
 		printk("buf[%ld][0]:[%p] buf[%ld][1]:[%ld] deref:[%ld]\n", i, (void *)*(p_group_buffer + i * 2),i,
 		       *(p_group_buffer + i * 2 + 1), *((size_t*)*(p_group_buffer + i * 2)));
 	}
+
+	printk("Hashtable iteration started\n");
+	hash_for_each(buckets, bucket_index, p_canary_entry, next){
+		printk(KERN_INFO "canary_location=%ld canary_value=%ld deref=%ld is in bucket %d\n", p_canary_entry->canary_location, p_canary_entry->canary_value, *((size_t*)p_canary_entry->canary_location),bucket_index);
+	}
+	printk("Hashtable iteration ended\n");
+
 	// TODO: Change the parameters to receive the canary information in bulk.
 	// This bulk count will be user configurable in the userspace.
 	// 
@@ -65,18 +83,6 @@ asmlinkage void *heapsentryk_mmap(void *addr, size_t length,
 // loaded into the kernel.
 static int __init mod_entry_func(void)
 {
-	int bucket_index;
-	struct canary_entry *p_canary_entry;
-	struct canary_entry entry1;
-	struct canary_entry entry2;
-
-	printk(KERN_INFO "bucket_index:%d p_canary_entry:%p\n",bucket_index,  p_canary_entry);
-	entry1.canary_location = 123;
-	entry1.canary_value = 45;
-	//entry1.next = NULL;
-	entry2.canary_location = 678;
-	entry2.canary_value = 90;
-	//entry2.next = NULL;
 
 	//printk(KERN_INFO "heapsentryk entering...\n");
 
@@ -102,15 +108,8 @@ static int __init mod_entry_func(void)
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
 
 
-	// Initialization of Hashtable
+	// Initialize the Hashtable to store the canary information.
 	hash_init(buckets);
-
-	hash_add(buckets, &entry1.next, entry1.canary_location);
-	hash_add(buckets, &entry2.next, entry2.canary_location);
-
-	hash_for_each(buckets, bucket_index, p_canary_entry, next){
-		printk(KERN_INFO "canary_location=%ld canary_value=%ld is in bucket %d\n", p_canary_entry->canary_location, p_canary_entry->canary_value, bucket_index);
-	}
 
 	return 0;
 }
