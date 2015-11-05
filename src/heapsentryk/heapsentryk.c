@@ -9,13 +9,12 @@ MODULE_LICENSE("GPL");
 
 // Look for system call numbers in /usr/include/asm-generic/unistd.h
 // Look for hashtable options in /usr/src/linux-headers-3.19.0-25/include/linux/hashtable.h
-
-// Hashtable to store canary information
-DEFINE_HASHTABLE(buckets, 20);
+// Look for list options in /usr/src/linux-headers-3.19.0-25/include/linux/list.h
 
 void **sys_call_table;
 
-void set_read_write(long unsigned int _addr);
+#define BUCKET_BITS_SIZE 5
+LIST_HEAD(process_list_head);
 
 struct canary_entry {
 	size_t canary_location;
@@ -24,14 +23,15 @@ struct canary_entry {
 };
 
 struct pid_entry {
-	struct hlist_head* p_process_hashtable;
+	struct hlist_head *p_process_hashtable;
 	struct list_head pid_list_head;
-}; 
+};
 
 asmlinkage int (*original_fork) (void);
 asmlinkage int (*original_chmod) (const char *pathname, int mode);
 asmlinkage int (*original_munmap) (void *addr, size_t length);
-asmlinkage int (*original_execve)(const char*, char *const argv[], char *const envp[]);
+asmlinkage int (*original_execve) (const char *, char *const argv[],
+				   char *const envp[]);
 asmlinkage int (*original_open) (const char *, int, int);
 asmlinkage void *(*original_mmap) (void *addr, size_t length, int prot,
 				   int flags, int fd, off_t offset);
@@ -41,10 +41,41 @@ asmlinkage int (*original_getpid) (void);
 asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
 				  int flags, int fd, off_t offset);
 asmlinkage int heapsentryk_munmap(void *addr, size_t length);
-asmlinkage int heapsentryk_execve(const char*, char *const argv[], char *const envp[]);
-asmlinkage int heapsentryk_open (const char *, int, int);
-asmlinkage int heapsentryk_fork (void);
-asmlinkage int heapsentryk_chmod (const char *pathname, int mode);
+asmlinkage int heapsentryk_execve(const char *, char *const argv[],
+				  char *const envp[]);
+asmlinkage int heapsentryk_open(const char *, int, int);
+asmlinkage int heapsentryk_fork(void);
+asmlinkage int heapsentryk_chmod(const char *pathname, int mode);
+
+void set_read_write(long unsigned int _addr);
+
+//asmlinkage struct canary_entry * find_canary_entry(struct hlist_head (*p_hashtable)[1 << BUCKET_BITS_SIZE]);
+asmlinkage struct pid_entry *find_pid_entry(int pid);
+
+asmlinkage struct pid_entry *find_pid_entry(int pid)
+{
+	printk("find_pid_entry entered\n");
+	return NULL;
+}
+
+asmlinkage struct canary_entry *find_canary_entry(struct
+						  hlist_head (*hashtable)[1 <<
+									  BUCKET_BITS_SIZE])
+{
+	int bucket_index = 0;
+	struct canary_entry *p_canary_entry = NULL;
+	printk("find_canary_entry entered\n");
+	hash_for_each((*hashtable), bucket_index, p_canary_entry, next) {
+		printk(KERN_INFO
+		       "canary_location=%d canary_value=%d deref=%d is in bucket %d\n",
+		       p_canary_entry->canary_location,
+		       p_canary_entry->canary_value,
+		       *((size_t *) p_canary_entry->canary_location),
+		       bucket_index);
+	}
+	printk("Hashtable iteration ended\n");
+	return NULL;
+}
 
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 
@@ -53,51 +84,45 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 // high-risk calls to verify the canaries.
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 {
-	int bucket_index = 0;
-	struct canary_entry *p_canary_entry = NULL;
 	struct canary_entry *entry = NULL;
-	size_t *p_group_buffer = (size_t *)v2;
-	size_t *p_group_count = (size_t *)v3;
+	size_t *p_group_buffer = (size_t *) v2;
+	size_t *p_group_count = (size_t *) v3;
 	size_t i = 0;
 
-
+	/*
 	struct pid_entry pid_list_entry;
-	LIST_HEAD(process_list_head);
-	struct list_head * position = NULL;
-	struct pid_entry * p_pid_entry = NULL;
+	struct list_head *position = NULL;
+	struct pid_entry *p_pid_entry = NULL;
+	*/
 
-	printk("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
-	       p_group_buffer, p_group_count);
-	printk("heapsentryk: dereferencing p_group_count:[%d]\n",*p_group_count);
+	// Hashtable to store canary information
+	DEFINE_HASHTABLE(buckets, BUCKET_BITS_SIZE);
+	// Initialize the Hashtable to store the canary information.
+	hash_init(buckets);
+
+	printk("sys_heapsentryk_canary: buckets: %p\n", buckets);
+	printk
+	    ("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
+	     p_group_buffer, p_group_count);
+	printk("heapsentryk: dereferencing p_group_count:[%d]\n",
+	       *p_group_count);
 	for (i = 0; i < *p_group_count; i++) {
 		// Allocate an object to store in Hash table that persists beyond the scope of this function.
-		entry = (struct canary_entry *) kmalloc(sizeof(struct canary_entry), GFP_KERNEL);
+		entry =
+		    (struct canary_entry *)kmalloc(sizeof(struct canary_entry),
+						   GFP_KERNEL);
 		memset((void *)entry, 0, sizeof(struct canary_entry));
 		entry->canary_location = *(p_group_buffer + i * 2);
-		entry->canary_value = *((size_t*)*(p_group_buffer + i * 2));
+		entry->canary_value = *((size_t *) * (p_group_buffer + i * 2));
 		hash_add(buckets, &entry->next, entry->canary_location);
-		printk("buf[%d][0]:[%p] buf[%d][1]:[%d] deref:[%d]\n", i, (void *)*(p_group_buffer + i * 2),i,
-		       *(p_group_buffer + i * 2 + 1), *((size_t*)*(p_group_buffer + i * 2)));
+		printk("buf[%d][0]:[%p] buf[%d][1]:[%d] deref:[%d]\n", i,
+		       (void *)*(p_group_buffer + i * 2), i,
+		       *(p_group_buffer + i * 2 + 1),
+		       *((size_t *) * (p_group_buffer + i * 2)));
 	}
 
-	printk("Hashtable iteration started. buckets:%p\n",buckets);
-	hash_for_each(buckets, bucket_index, p_canary_entry, next){
-		printk(KERN_INFO "canary_location=%d canary_value=%d deref=%d is in bucket %d\n", p_canary_entry->canary_location, p_canary_entry->canary_value, *((size_t*)p_canary_entry->canary_location),bucket_index);
-	}
-	printk(KERN_INFO "sys_canary() from PID:%d\n",original_getpid());
-	printk("Hashtable iteration ended\n");
-
-
-	printk("Start: Linked list for PID<-->Hashtable information\n");
-	pid_list_entry.p_process_hashtable = buckets;
-	INIT_LIST_HEAD(&pid_list_entry.pid_list_head);
-	list_add(&pid_list_entry.pid_list_head, &process_list_head);
-	list_for_each(position, &process_list_head)
-	{
-		p_pid_entry = list_entry(position, struct pid_entry, pid_list_head);
-		printk("p_process_hashtable: %p\n",p_pid_entry->p_process_hashtable);
-	}
-	printk("End: Linked list for PID<-->Hashtable information\n");
+	//find_pid_entry(10);
+	find_canary_entry(&buckets);
 
 	// TODO: Change the parameters to receive the canary information in bulk.
 	// This bulk count will be user configurable in the userspace.
@@ -106,25 +131,26 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 	return 30;
 }
 
-asmlinkage int heapsentryk_execve(const char* filename, char *const argv[], char *const envp[])
+asmlinkage int heapsentryk_execve(const char *filename, char *const argv[],
+				  char *const envp[])
 {
 	printk(KERN_INFO "Entered heapsentryk_execve()\n");
 	return original_execve(filename, argv, envp);
 }
 
-asmlinkage int heapsentryk_open (const char *pathname, int flags, int mode)
+asmlinkage int heapsentryk_open(const char *pathname, int flags, int mode)
 {
 	//printk(KERN_INFO "Entered heapsentryk_open()\n");
 	return original_open(pathname, flags, mode);
 }
 
-asmlinkage int heapsentryk_fork (void)
+asmlinkage int heapsentryk_fork(void)
 {
 	//printk(KERN_INFO "Entered heapsentryk_fork()\n");
 	return original_fork();
 }
 
-asmlinkage int heapsentryk_chmod (const char *pathname, int mode)
+asmlinkage int heapsentryk_chmod(const char *pathname, int mode)
 {
 	//printk(KERN_INFO "Entered heapsentryk_chmod()\n");
 	return original_chmod(pathname, mode);
@@ -182,10 +208,7 @@ static int __init mod_entry_func(void)
 	// Setting HeapSentry system call to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
 
-	// Initialize the Hashtable to store the canary information.
-	hash_init(buckets);
-
-	printk(KERN_INFO "Init PID: %d\n",original_getpid());
+	printk(KERN_INFO "Init PID: %d\n", original_getpid());
 
 	return 0;
 }
