@@ -65,9 +65,9 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 
 asmlinkage Pid_entry *find_pid_entry(int pid)
 {
+	Pid_entry *entry = NULL;
 	struct list_head *position = NULL;
 	Pid_entry *p_pid_entry = NULL;
-	Pid_entry *entry = NULL;
 
 	list_for_each(position, &pid_list) {
 		p_pid_entry = list_entry(position, Pid_entry, pid_list_head);
@@ -80,7 +80,7 @@ asmlinkage Pid_entry *find_pid_entry(int pid)
 }
 
 asmlinkage Canary_entry *find_canary_entry(struct
-					   hlist_head(*hashtable)[1 <<
+					   hlist_head (*hashtable)[1 <<
 								  BUCKET_BITS_SIZE])
 {
 	int bucket_index = 0;
@@ -101,15 +101,11 @@ asmlinkage Canary_entry *find_canary_entry(struct
 // high-risk calls to verify the canaries.
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 {
-	Canary_entry *entry = NULL;
 	size_t *p_group_buffer = (size_t *) v2;
 	size_t *p_group_count = (size_t *) v3;
-	size_t i = 0;
+	struct hlist_head (*p_hash)[1 << BUCKET_BITS_SIZE] = NULL;
 
-	Pid_entry pid_list_entry;
 	Pid_entry *p_pid_entry = NULL;
-	DEFINE_HASHTABLE(buckets, BUCKET_BITS_SIZE);
-	hash_init(buckets);
 
 	/*
 	   printk("buf[%d][0]:[%p] buf[%d][1]:[%d] deref:[%d]\n", i,
@@ -122,45 +118,50 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 	     p_group_buffer, p_group_count);
 	printk("heapsentryk: dereferencing p_group_count:[%d]\n",
 	       *p_group_count);
-	for (i = 0; i < *p_group_count; i++) {
-		entry = (Canary_entry *) kmalloc(sizeof(Canary_entry), GFP_KERNEL);
-		memset((void *)entry, 0, sizeof(Canary_entry));
-		entry->canary_location = *(p_group_buffer + i * 2);
-		entry->canary_value = *((size_t *) * (p_group_buffer + i * 2));
-		hash_add(buckets, &entry->next, entry->canary_location);
-	}
-
-	p_pid_entry = find_pid_entry(original_getpid());
-	if (!p_pid_entry) {
-		printk("pid_entry not found for pid:%d\n", original_getpid());
-		// TODO:
-		// 1) Create a new hashtable and add canary information into it.
-		// 2) Create and add a linked list entry for this process.
-	} else {
-		printk("Found pid_entry:%p not found for pid:%d\n", p_pid_entry,
-		       original_getpid());
-		// TODO:
-		// Add the canary information into existing hashtable.
-	}
-
-	// An object that connects PIDs to its corresponding hashtable.
-	pid_list_entry.pid = original_getpid();
-	pid_list_entry.p_process_hashtable = buckets;
-	INIT_LIST_HEAD(&pid_list_entry.pid_list_head);
-
-	// Adding the object 'pid_list_entry' into linked list by name 'pid_list'
-	list_add(&pid_list_entry.pid_list_head, &pid_list);
 
 	// Checking if there is an entry in the linked list corresponding to the current process.
 	p_pid_entry = find_pid_entry(original_getpid());
 	if (!p_pid_entry) {
+		Pid_entry * p_pid_entry = (Pid_entry *) kmalloc(sizeof(Pid_entry), GFP_KERNEL);
+		DEFINE_HASHTABLE(buckets, BUCKET_BITS_SIZE);
+		size_t i = 0;
 		printk("pid_entry not found for pid:%d\n", original_getpid());
+		
+		hash_init(buckets);
+
+		// Adding canaries to hashtable.
+		for (i = 0; i < *p_group_count; i++) {
+			Canary_entry *entry =
+			    (Canary_entry *) kmalloc(sizeof(Canary_entry),
+						     GFP_KERNEL);
+			memset((void *)entry, 0, sizeof(Canary_entry));
+			entry->canary_location = *(p_group_buffer + i * 2);
+			entry->canary_value =
+			    *((size_t *) * (p_group_buffer + i * 2));
+			hash_add(buckets, &entry->next, entry->canary_location);
+		}
+		//p_hash = &buckets;
+		//find_canary_entry(p_hash);
+
+		// An object that connects PIDs to its corresponding hashtable.
+		p_pid_entry->pid = original_getpid();
+		p_pid_entry->p_process_hashtable = buckets;
+		INIT_LIST_HEAD(&p_pid_entry->pid_list_head);
+		// Adding the object 'pid_list_entry' into linked list by name 'pid_list'
+		list_add(&p_pid_entry->pid_list_head, &pid_list);
 	} else {
-		printk("Found pid_entry:%p for pid:%d\n", p_pid_entry,
+		printk("Found pid_entry:%p found for pid:%d\n", p_pid_entry,
 		       original_getpid());
+		// Add the canary information into existing hashtable.
 	}
 
-	find_canary_entry(&buckets);
+	p_pid_entry = find_pid_entry(original_getpid());
+	if (!p_pid_entry) {
+		printk("pid_entry not found for pid:%d\n", original_getpid());
+	}else{
+		printk("Found pid_entry:%p found for pid:%d\n", p_pid_entry,
+		       original_getpid());
+	}
 
 	return 0;
 }
@@ -168,7 +169,7 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 asmlinkage int heapsentryk_execve(const char *filename, char *const argv[],
 				  char *const envp[])
 {
-	printk(KERN_INFO "Entered heapsentryk_execve()\n");
+	//printk(KERN_INFO "Entered heapsentryk_execve()\n");
 	return original_execve(filename, argv, envp);
 }
 
@@ -241,8 +242,6 @@ static int __init mod_entry_func(void)
 
 	// Setting HeapSentry system call to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
-
-	printk(KERN_INFO "Init PID: %d\n", original_getpid());
 
 	return 0;
 }
