@@ -1,6 +1,7 @@
 #include <linux/module.h>
 #include <linux/unistd.h>
 #include <linux/hashtable.h>
+#include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/prctl.h>
@@ -10,6 +11,7 @@ MODULE_LICENSE("GPL");
 // Look for system call numbers in /usr/include/asm-generic/unistd.h
 // Look for hashtable options in /usr/src/linux-headers-3.19.0-25/include/linux/hashtable.h
 // Look for list options in /usr/src/linux-headers-3.19.0-25/include/linux/list.h
+// Look for system calls syntax in /usr/src/linux-headers-3.19.0-25/include/linux/syscalls.h
 
 void **sys_call_table;
 
@@ -24,7 +26,7 @@ LIST_HEAD(pid_list);
 // The object that the link list holds.
 typedef struct pid_entry {
 	int pid;
-	struct hlist_head *p_process_hashtable;
+	struct hlist_head (*p_process_hashtable)[BUCKET_BITS_SIZE];
 	struct list_head pid_list_head;
 } Pid_entry;
 
@@ -43,8 +45,10 @@ asmlinkage int (*original_execve) (const char *, char *const argv[],
 asmlinkage int (*original_open) (const char *, int, int);
 asmlinkage void *(*original_mmap) (void *addr, size_t length, int prot,
 				   int flags, int fd, off_t offset);
-asmlinkage void (*original_exit) (int status);
+asmlinkage int (*original_exit) (int status);
 asmlinkage int (*original_getpid) (void);
+asmlinkage long (*original_clone) (unsigned long v1, unsigned long v2, int __user * v3,
+		                 int __user * v4, int v5);
 
 asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
 				  int flags, int fd, off_t offset);
@@ -53,9 +57,21 @@ asmlinkage int heapsentryk_execve(const char *, char *const argv[],
 				  char *const envp[]);
 asmlinkage int heapsentryk_open(const char *, int, int);
 asmlinkage int heapsentryk_fork(void);
-asmlinkage int heapsentryk_chmod(const char *pathname, int mode);
+//asmlinkage int heapsentryk_chmod(const char *pathname, int mode);
+asmlinkage long heapsentryk_chmod(const char __user *filename, umode_t mode);
+asmlinkage int heapsentryk_exit (int status);
+asmlinkage long heapsentryk_clone (unsigned long v1, unsigned long v2, int __user * v3,
+		                 int __user * v4, int v5);
 
 void set_read_write(long unsigned int _addr);
+
+asmlinkage long heapsentryk_clone (unsigned long v1, unsigned long v2, int __user * v3,
+		                 int __user * v4, int v5)
+{
+
+	printk(KERN_INFO "Entered heapsentryk_clone() clone clone clone clone clone clone clone\n");
+	return original_clone(v1,v2,v3,v4,v5);
+}
 
 asmlinkage Canary_entry *find_canary_entry(struct
 					   hlist_head (*hashtable)[1 <<
@@ -67,9 +83,10 @@ asmlinkage Pid_entry *find_pid_entry(int pid)
 {
 	Pid_entry *entry = NULL;
 	struct list_head *position = NULL;
+	struct list_head *list_iterator = NULL;
 	Pid_entry *p_pid_entry = NULL;
 
-	list_for_each(position, &pid_list) {
+	list_for_each_safe (position,list_iterator, &pid_list) {
 		p_pid_entry = list_entry(position, Pid_entry, pid_list_head);
 		if (pid == p_pid_entry->pid) {
 			entry = p_pid_entry;
@@ -85,7 +102,7 @@ asmlinkage Canary_entry *find_canary_entry(struct
 {
 	int bucket_index = 0;
 	Canary_entry *p_canary_entry = NULL;
-	hash_for_each((*hashtable), bucket_index, p_canary_entry, next) {
+	hash_for_each_rcu((*hashtable), bucket_index, p_canary_entry, next) {
 		printk(KERN_INFO
 		       "canary_location=%d canary_value=%d deref=%d is in bucket %d\n",
 		       p_canary_entry->canary_location,
@@ -142,7 +159,7 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 			entry->canary_location = *(p_group_buffer + i * 2);
 			entry->canary_value =
 			    *((size_t *) * (p_group_buffer + i * 2));
-			hash_add((*buckets), &entry->next, entry->canary_location);
+			hash_add_rcu((*buckets), &entry->next, entry->canary_location);
 		}
 		p_hash = buckets;
 		find_canary_entry(p_hash);
@@ -154,20 +171,32 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 		// Adding the object 'pid_list_entry' into linked list by name 'pid_list'
 		list_add(&p_pid_entry->pid_list_head, &pid_list);
 	} else {
-		printk("Found pid_entry:%p found for pid:%d\n", p_pid_entry,
-		       original_getpid());
 		// Add the canary information into existing hashtable.
-	}
-
-	p_pid_entry = find_pid_entry(original_getpid());
-	if (!p_pid_entry) {
-		printk("pid_entry not found for pid:%d\n", original_getpid());
-	}else{
+		struct hlist_head (*buckets)[1 << BUCKET_BITS_SIZE] = p_pid_entry->p_process_hashtable;
+		size_t i = 0;
 		printk("Found pid_entry:%p found for pid:%d\n", p_pid_entry,
 		       original_getpid());
+		// Adding canaries to hashtable.
+		for (i = 0; i < *p_group_count; i++) {
+			Canary_entry *entry =
+			    (Canary_entry *) kmalloc(sizeof(Canary_entry),
+						     GFP_KERNEL);
+			memset((void *)entry, 0, sizeof(Canary_entry));
+			entry->canary_location = *(p_group_buffer + i * 2);
+			entry->canary_value =
+			    *((size_t *) * (p_group_buffer + i * 2));
+			hash_add_rcu((*buckets), &entry->next, entry->canary_location);
+		}
+		p_hash = buckets;
+		find_canary_entry(p_hash);
 	}
-
 	return 0;
+}
+
+asmlinkage int heapsentryk_exit(int status)
+{
+	printk(KERN_INFO "Entered heapsentryk_exit(): pid:%d\n", original_getpid());
+	return original_exit(status);
 }
 
 asmlinkage int heapsentryk_execve(const char *filename, char *const argv[],
@@ -185,14 +214,15 @@ asmlinkage int heapsentryk_open(const char *pathname, int flags, int mode)
 
 asmlinkage int heapsentryk_fork(void)
 {
-	//printk(KERN_INFO "Entered heapsentryk_fork()\n");
+	printk(KERN_INFO "Entered heapsentryk_fork() fork fork fork fork fork fork fork\n");
 	return original_fork();
 }
 
-asmlinkage int heapsentryk_chmod(const char *pathname, int mode)
+//asmlinkage int heapsentryk_chmod(const char *pathname, int mode)
+asmlinkage long heapsentryk_chmod(const char __user *filename, umode_t mode)
 {
-	//printk(KERN_INFO "Entered heapsentryk_chmod()\n");
-	return original_chmod(pathname, mode);
+	printk(KERN_INFO "Entered heapsentryk_chmod() chmod chmod chmod chmod chmod\n");
+	return original_chmod(filename, mode);
 }
 
 asmlinkage int heapsentryk_munmap(void *addr, size_t length)
@@ -232,6 +262,8 @@ static int __init mod_entry_func(void)
 	original_fork = sys_call_table[__NR_fork];
 	original_chmod = sys_call_table[__NR_chmod];
 	original_getpid = sys_call_table[__NR_getpid];
+	original_exit = sys_call_table[__NR_exit];
+	original_clone = sys_call_table[__NR_clone];
 
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
@@ -243,6 +275,8 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_execve] = heapsentryk_execve;
 	sys_call_table[__NR_fork] = heapsentryk_fork;
 	sys_call_table[__NR_chmod] = heapsentryk_chmod;
+	sys_call_table[__NR_exit] = heapsentryk_exit;
+	sys_call_table[__NR_clone] = heapsentryk_clone;
 
 	// Setting HeapSentry system call to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
@@ -261,6 +295,9 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_open] = original_open;
 	sys_call_table[__NR_fork] = original_fork;
 	sys_call_table[__NR_chmod] = original_chmod;
+	sys_call_table[__NR_exit] = original_exit;
+	sys_call_table[__NR_clone] = original_clone;
+
 	sys_call_table[SYS_CALL_NUMBER] = 0;
 	printk(KERN_INFO "heapsentryk exiting...\n");
 }
