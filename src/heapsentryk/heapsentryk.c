@@ -123,11 +123,15 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 	p_pid_entry = find_pid_entry(original_getpid());
 	if (!p_pid_entry) {
 		Pid_entry * p_pid_entry = (Pid_entry *) kmalloc(sizeof(Pid_entry), GFP_KERNEL);
-		DEFINE_HASHTABLE(buckets, BUCKET_BITS_SIZE);
+		struct hlist_head (*buckets)[1 << BUCKET_BITS_SIZE] = (struct hlist_head (*)[1 << BUCKET_BITS_SIZE]) kmalloc(sizeof(struct hlist_head (*)[1 << BUCKET_BITS_SIZE]), GFP_KERNEL);
 		size_t i = 0;
+		
 		printk("pid_entry not found for pid:%d\n", original_getpid());
 		
-		hash_init(buckets);
+		// Braces are added to void bugs that could arise by macro substitutions.
+		// Since there is an asterisk in the argument, if the macro places the
+		// argument as a suffix, there will be a problem.
+		hash_init((*buckets));
 
 		// Adding canaries to hashtable.
 		for (i = 0; i < *p_group_count; i++) {
@@ -138,14 +142,14 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 			entry->canary_location = *(p_group_buffer + i * 2);
 			entry->canary_value =
 			    *((size_t *) * (p_group_buffer + i * 2));
-			hash_add(buckets, &entry->next, entry->canary_location);
+			hash_add((*buckets), &entry->next, entry->canary_location);
 		}
-		//p_hash = &buckets;
-		//find_canary_entry(p_hash);
+		p_hash = buckets;
+		find_canary_entry(p_hash);
 
 		// An object that connects PIDs to its corresponding hashtable.
 		p_pid_entry->pid = original_getpid();
-		p_pid_entry->p_process_hashtable = buckets;
+		p_pid_entry->p_process_hashtable = *buckets;
 		INIT_LIST_HEAD(&p_pid_entry->pid_list_head);
 		// Adding the object 'pid_list_entry' into linked list by name 'pid_list'
 		list_add(&p_pid_entry->pid_list_head, &pid_list);
