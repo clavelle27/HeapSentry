@@ -22,18 +22,18 @@ void **sys_call_table;
 LIST_HEAD(pid_list);
 
 // The object that the link list holds.
-struct pid_entry {
+typedef struct pid_entry {
 	int pid;
 	struct hlist_head *p_process_hashtable;
 	struct list_head pid_list_head;
-};
+} Pid_entry;
 
 // The object identified by a key(canary_location) in hashtable which holds canary information.
-struct canary_entry {
+typedef struct canary_entry {
 	size_t canary_location;
 	size_t canary_value;
 	struct hlist_node next;
-};
+} Canary_entry;
 
 asmlinkage int (*original_fork) (void);
 asmlinkage int (*original_chmod) (const char *pathname, int mode);
@@ -57,21 +57,20 @@ asmlinkage int heapsentryk_chmod(const char *pathname, int mode);
 
 void set_read_write(long unsigned int _addr);
 
-asmlinkage struct canary_entry *find_canary_entry(struct
-						  hlist_head (*hashtable)[1 <<
-									  BUCKET_BITS_SIZE]);
-asmlinkage struct pid_entry *find_pid_entry(int pid);
+asmlinkage Canary_entry *find_canary_entry(struct
+					   hlist_head (*hashtable)[1 <<
+								   BUCKET_BITS_SIZE]);
+asmlinkage Pid_entry *find_pid_entry(int pid);
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
 
-asmlinkage struct pid_entry *find_pid_entry(int pid)
+asmlinkage Pid_entry *find_pid_entry(int pid)
 {
 	struct list_head *position = NULL;
-	struct pid_entry *p_pid_entry = NULL;
-	struct pid_entry *entry = NULL;
+	Pid_entry *p_pid_entry = NULL;
+	Pid_entry *entry = NULL;
 
 	list_for_each(position, &pid_list) {
-		p_pid_entry =
-		    list_entry(position, struct pid_entry, pid_list_head);
+		p_pid_entry = list_entry(position, Pid_entry, pid_list_head);
 		if (pid == p_pid_entry->pid) {
 			entry = p_pid_entry;
 			break;
@@ -80,12 +79,12 @@ asmlinkage struct pid_entry *find_pid_entry(int pid)
 	return entry;
 }
 
-asmlinkage struct canary_entry *find_canary_entry(struct
-						  hlist_head (*hashtable)[1 <<
-									  BUCKET_BITS_SIZE])
+asmlinkage Canary_entry *find_canary_entry(struct
+					   hlist_head(*hashtable)[1 <<
+								  BUCKET_BITS_SIZE])
 {
 	int bucket_index = 0;
-	struct canary_entry *p_canary_entry = NULL;
+	Canary_entry *p_canary_entry = NULL;
 	hash_for_each((*hashtable), bucket_index, p_canary_entry, next) {
 		printk(KERN_INFO
 		       "canary_location=%d canary_value=%d deref=%d is in bucket %d\n",
@@ -102,39 +101,33 @@ asmlinkage struct canary_entry *find_canary_entry(struct
 // high-risk calls to verify the canaries.
 asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 {
-	struct canary_entry *entry = NULL;
+	Canary_entry *entry = NULL;
 	size_t *p_group_buffer = (size_t *) v2;
 	size_t *p_group_count = (size_t *) v3;
 	size_t i = 0;
 
-	struct pid_entry pid_list_entry;
-	struct pid_entry *p_pid_entry = NULL;
-
-	// Hashtable to store canary information
+	Pid_entry pid_list_entry;
+	Pid_entry *p_pid_entry = NULL;
 	DEFINE_HASHTABLE(buckets, BUCKET_BITS_SIZE);
-	// Initialize the Hashtable to store the canary information.
 	hash_init(buckets);
 
+	/*
+	   printk("buf[%d][0]:[%p] buf[%d][1]:[%d] deref:[%d]\n", i,
+	   (void *)*(p_group_buffer + i * 2), i,
+	   *(p_group_buffer + i * 2 + 1),
+	   *((size_t *) * (p_group_buffer + i * 2)));
+	 */
 	printk
 	    ("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
 	     p_group_buffer, p_group_count);
 	printk("heapsentryk: dereferencing p_group_count:[%d]\n",
 	       *p_group_count);
 	for (i = 0; i < *p_group_count; i++) {
-		// Allocate an object to store in Hash table that persists beyond the scope of this function.
-		entry =
-		    (struct canary_entry *)kmalloc(sizeof(struct canary_entry),
-						   GFP_KERNEL);
-		memset((void *)entry, 0, sizeof(struct canary_entry));
+		entry = (Canary_entry *) kmalloc(sizeof(Canary_entry), GFP_KERNEL);
+		memset((void *)entry, 0, sizeof(Canary_entry));
 		entry->canary_location = *(p_group_buffer + i * 2);
 		entry->canary_value = *((size_t *) * (p_group_buffer + i * 2));
 		hash_add(buckets, &entry->next, entry->canary_location);
-		/*
-		   printk("buf[%d][0]:[%p] buf[%d][1]:[%d] deref:[%d]\n", i,
-		   (void *)*(p_group_buffer + i * 2), i,
-		   *(p_group_buffer + i * 2 + 1),
-		   *((size_t *) * (p_group_buffer + i * 2)));
-		 */
 	}
 
 	p_pid_entry = find_pid_entry(original_getpid());
