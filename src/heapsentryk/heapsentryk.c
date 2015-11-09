@@ -26,7 +26,7 @@ LIST_HEAD(pid_list);
 // The object that the link list holds.
 typedef struct pid_entry {
 	int pid;
-	struct hlist_head (*p_process_hashtable)[BUCKET_BITS_SIZE];
+	struct hlist_head (*p_process_hashtable)[1 << BUCKET_BITS_SIZE];
 	struct list_head pid_list_head;
 } Pid_entry;
 
@@ -166,7 +166,7 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 
 		// An object that connects PIDs to its corresponding hashtable.
 		p_pid_entry->pid = original_getpid();
-		p_pid_entry->p_process_hashtable = *buckets;
+		p_pid_entry->p_process_hashtable = buckets;
 		INIT_LIST_HEAD(&p_pid_entry->pid_list_head);
 		// Adding the object 'pid_list_entry' into linked list by name 'pid_list'
 		list_add(&p_pid_entry->pid_list_head, &pid_list);
