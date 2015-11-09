@@ -37,26 +37,18 @@ typedef struct canary_entry {
 	struct hlist_node next;
 } Canary_entry;
 
-asmlinkage int (*original_fork) (void);
 asmlinkage int (*original_chmod) (const char *pathname, int mode);
-asmlinkage int (*original_munmap) (void *addr, size_t length);
 asmlinkage int (*original_execve) (const char *, char *const argv[],
 				   char *const envp[]);
 asmlinkage int (*original_open) (const char *, int, int);
-asmlinkage void *(*original_mmap) (void *addr, size_t length, int prot,
-				   int flags, int fd, off_t offset);
 asmlinkage int (*original_exit) (int status);
 asmlinkage int (*original_getpid) (void);
 asmlinkage long (*original_clone) (unsigned long v1, unsigned long v2, int __user * v3,
 		                 int __user * v4, int v5);
 
-asmlinkage void *heapsentryk_mmap(void *addr, size_t length, int prot,
-				  int flags, int fd, off_t offset);
-asmlinkage int heapsentryk_munmap(void *addr, size_t length);
 asmlinkage int heapsentryk_execve(const char *, char *const argv[],
 				  char *const envp[]);
 asmlinkage int heapsentryk_open(const char *, int, int);
-asmlinkage int heapsentryk_fork(void);
 //asmlinkage int heapsentryk_chmod(const char *pathname, int mode);
 asmlinkage long heapsentryk_chmod(const char __user *filename, umode_t mode);
 asmlinkage int heapsentryk_exit (int status);
@@ -212,30 +204,11 @@ asmlinkage int heapsentryk_open(const char *pathname, int flags, int mode)
 	return original_open(pathname, flags, mode);
 }
 
-asmlinkage int heapsentryk_fork(void)
-{
-	printk(KERN_INFO "Entered heapsentryk_fork() fork fork fork fork fork fork fork\n");
-	return original_fork();
-}
-
 //asmlinkage int heapsentryk_chmod(const char *pathname, int mode)
 asmlinkage long heapsentryk_chmod(const char __user *filename, umode_t mode)
 {
 	printk(KERN_INFO "Entered heapsentryk_chmod() chmod chmod chmod chmod chmod\n");
 	return original_chmod(filename, mode);
-}
-
-asmlinkage int heapsentryk_munmap(void *addr, size_t length)
-{
-	//printk(KERN_INFO "Entered heapsentryk_munmap()\n");
-	return original_munmap(addr, length);
-}
-
-asmlinkage void *heapsentryk_mmap(void *addr, size_t length,
-				  int prot, int flags, int fd, off_t offset)
-{
-	//printk("KERN_INFO Entered heapsentryk_mmap()\n");
-	return original_mmap(addr, length, prot, flags, fd, offset);
 }
 
 // Init function of this kernel module. This gets executed when the module is
@@ -255,11 +228,8 @@ static int __init mod_entry_func(void)
 	//
 	// Table should be restored to contain its original addresses when this
 	// module in unloaded.
-	original_mmap = sys_call_table[__NR_mmap];
-	original_munmap = sys_call_table[__NR_munmap];
 	original_execve = sys_call_table[__NR_execve];
 	original_open = sys_call_table[__NR_open];
-	original_fork = sys_call_table[__NR_fork];
 	original_chmod = sys_call_table[__NR_chmod];
 	original_getpid = sys_call_table[__NR_getpid];
 	original_exit = sys_call_table[__NR_exit];
@@ -269,11 +239,8 @@ static int __init mod_entry_func(void)
 	// In these substituted function, decision can be taken regarding further
 	// actions. Either exiting the process or letting the request through to
 	// original syscalls.
-	sys_call_table[__NR_mmap] = heapsentryk_mmap;
-	sys_call_table[__NR_munmap] = heapsentryk_munmap;
 	sys_call_table[__NR_open] = heapsentryk_open;
 	sys_call_table[__NR_execve] = heapsentryk_execve;
-	sys_call_table[__NR_fork] = heapsentryk_fork;
 	sys_call_table[__NR_chmod] = heapsentryk_chmod;
 	sys_call_table[__NR_exit] = heapsentryk_exit;
 	sys_call_table[__NR_clone] = heapsentryk_clone;
@@ -289,11 +256,8 @@ static int __init mod_entry_func(void)
 static void __exit mod_exit_func(void)
 {
 	// Restoring the original addresses of the system calls in the table.
-	sys_call_table[__NR_mmap] = original_mmap;
-	sys_call_table[__NR_munmap] = original_munmap;
 	sys_call_table[__NR_execve] = original_execve;
 	sys_call_table[__NR_open] = original_open;
-	sys_call_table[__NR_fork] = original_fork;
 	sys_call_table[__NR_chmod] = original_chmod;
 	sys_call_table[__NR_exit] = original_exit;
 	sys_call_table[__NR_clone] = original_clone;
