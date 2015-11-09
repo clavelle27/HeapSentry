@@ -31,5 +31,4 @@ int main(int argc, char *argv[], char *envp[]){
 	//printf("value of a(after):%d\n",*a);
 	fork();
 	printf("Exiting libtest\n");
-	exit(0);
 }
