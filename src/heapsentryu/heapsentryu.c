@@ -5,7 +5,7 @@
 #include <dlfcn.h>
 
 size_t *p_group_buffer;
-size_t *p_group_count = 0;
+size_t group_count = 0;
 // These are the function pointers used to hold the address of 
 // actual system calls. The syntax of these function pointers
 // should precisely match with the syntax of real system calls.
@@ -15,8 +15,11 @@ typedef void (*real_free) (void *ptr);
 // The function which invokes the HeapSentry's system call.
 size_t sys_canary();
 
+// This system call informs kernel the address of group buffer and group count variable.
+size_t sys_canary_init();
+
 // Initializes the random number generator
-void init_random();
+void heapsentryu_init();
 
 // If this library is preloaded before any binary execution, then
 // this malloc() will be invoked, instead of stdlib malloc().
@@ -32,6 +35,14 @@ void *malloc(size_t size)
 	// Determine the function pointer of libc malloc().
 	real_malloc rmalloc = (real_malloc) dlsym(RTLD_NEXT, "malloc");
 
+	// TODO: Fill up an array (probably) of size configured by user and pass it
+	// to kernel when it gets filled.
+	if (!p_group_buffer) {
+		p_group_buffer =
+		    (size_t *) rmalloc(CANARY_GROUP_SIZE * 2 * sizeof(size_t));
+	}
+
+
 	// sizeof(int) depends on the compiler and not the hardware.
 	// So, it is not good to assume it to be 4 or 8 or whatever.
 	size_t modified_size = size + sizeof(int);
@@ -43,7 +54,7 @@ void *malloc(size_t size)
 	int *canary_location = (int *)(obj + size);
 
 	// Setting the seed for random number generation. This happens once per library load.
-    init_random();
+	heapsentryu_init();
 
 	// Generating a random number and casting it to size of int.
 	int canary = (int)rand();
@@ -51,26 +62,17 @@ void *malloc(size_t size)
 	// Saving the canary at its designated location.
 	*canary_location = canary;
 
-	// TODO: Fill up an array (probably) of size configured by user and pass it
-	// to kernel when it gets filled.
-	if (!p_group_buffer) {
-		p_group_buffer =
-		    (size_t *) rmalloc(CANARY_GROUP_SIZE * 2 * sizeof(size_t));
-	}
-	if (!p_group_count) {
-		p_group_count = (size_t *) rmalloc(sizeof(size_t));
-	}
-	*(p_group_buffer + *p_group_count * 2) = (size_t) canary_location;
-	*(p_group_buffer + *p_group_count * 2 + 1) = (size_t) canary;
-	printf("p_group_buffer[%d][0]: %d\n", *p_group_count,
-	       (int)*(p_group_buffer + *p_group_count * 2));
-	printf("p_group_buffer[%d][1]: %d\n", *p_group_count,
-	       (int)*(p_group_buffer + *p_group_count * 2 + 1));
-	(*p_group_count)++;
+	*(p_group_buffer + group_count * 2) = (size_t) canary_location;
+	*(p_group_buffer + group_count * 2 + 1) = (size_t) canary;
+	printf("p_group_buffer[%d][0]: %d\n", group_count,
+	       (int)*(p_group_buffer + group_count * 2));
+	printf("p_group_buffer[%d][1]: %d\n", group_count,
+	       (int)*(p_group_buffer + group_count * 2 + 1));
+	(group_count)++;
 
-	if (*p_group_count == CANARY_GROUP_SIZE) {
+	if (group_count == CANARY_GROUP_SIZE) {
 		sys_canary();
-		*p_group_count = 0;
+		group_count = 0;
 	}
 
 	return obj;
@@ -91,19 +93,39 @@ void free(void *ptr)
 	return rfree(ptr);
 }
 
-size_t sys_canary()
+size_t sys_canary_init()
 {
 	size_t r = -1;
-	size_t n = (size_t) SYS_CALL_NUMBER;
-	printf("libheapsentryu:sending: p_group_buffer:[%p] p_group_count:[%p] *p_group_count:[%d]\n",
-	       p_group_buffer, p_group_count, *p_group_count);
+	size_t n = (size_t) SYS_CANARY_INIT_NUMBER;
+	
+	printf
+	    ("libheapsentryu:sending: p_group_buffer:[%p] p_group_count:[%p] *p_group_count:[%d]\n",
+	     p_group_buffer, &group_count, group_count);
 	// Below instruction puts the input parameter in rdx, system call
 	// number in rax and triggers an interrupt.
 	//
 	// The output parameter is stored into the variable 'r' via rax.
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
 			     "D"((size_t) p_group_buffer), "S"(n),
-			     "d"((size_t) p_group_count):"cc", "memory");
+			     "d"((size_t) &group_count):"cc", "memory");
+	return r;
+}
+
+size_t sys_canary()
+{
+
+	size_t r = -1;
+	size_t n = (size_t) SYS_CALL_NUMBER;
+	printf
+	    ("libheapsentryu:sending: p_group_buffer:[%p] p_group_count:[%p] group_count:[%d]\n",
+	     p_group_buffer, &group_count, group_count);
+	// Below instruction puts the input parameter in rdx, system call
+	// number in rax and triggers an interrupt.
+	//
+	// The output parameter is stored into the variable 'r' via rax.
+	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
+			     "D"((size_t) p_group_buffer), "S"(n),
+			     "d"((size_t) &group_count):"cc", "memory");
 	return r;
 }
 
@@ -114,14 +136,13 @@ size_t sys_canary()
 // Warning: There is still a window of upto 1sec where the same seq of random numbers 
 // are produced across process invocations. Cos time(NULL) will be the same within a
 // second.
-void init_random( void )
+void heapsentryu_init(void)
 {
-    static int init_done = 0;
+	static int init_done = 0;
 
-    if ( !init_done )
-    {
-        srand( time( NULL) );
-        init_done = 1;
-    }
+	if (!init_done) {
+		sys_canary_init();
+		srand(time(NULL));
+		init_done = 1;
+	}
 }
-

@@ -9,7 +9,7 @@ libheapsentryu: $(SRCS:%.c=%.o)
 
 %.o: %.c
 	@mkdir -p $(dir $@)
-	$(CC) -c $(CFLAGS) -DCANARY_GROUP_SIZE=$(CANARY_GROUP_SIZE) -DSYS_CALL_NUMBER=$(SYS_CALL_NUMBER) $(OPTS) -o $@ $^ 
+	$(CC) -c $(CFLAGS) -DCANARY_GROUP_SIZE=$(CANARY_GROUP_SIZE) -DSYS_CALL_NUMBER=$(SYS_CALL_NUMBER) -DSYS_CANARY_INIT_NUMBER=$(SYS_CANARY_INIT_NUMBER) $(OPTS) -o $@ $^ 
 
 clean:
 	rm -rf obj *.o ../../lib/libheapsentryu.so *.swp

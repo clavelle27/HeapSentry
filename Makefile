@@ -13,13 +13,14 @@ CANARY_GROUP_SIZE:=5
 # For 32-bit machines
 SYS_CALL_TABLE_ADDRESS=0x$(shell sudo cat /boot/System.map-`uname -a | cut -d " " -f3` | grep sys_call_table | cut -d " " -f1 )
 
+SYS_CANARY_INIT_NUMBER:=279
 SYS_CALL_NUMBER:=280
 ROOT_DIR:=$(shell pwd)
 LIB_DIR:=$(ROOT_DIR)/lib
 CC=gcc
 CFLAGS=-O0 -std=c99 -Wall -Werror -I$(INCLUDE_DIR) -fPIC -g3
 INCLUDE_DIR:=$(ROOT_DIR)/include
-export ROOT_DIR LIB_DIR INCLUDE_DIR CC CFLAGS SYS_CALL_TABLE_ADDRESS SYS_CALL_NUMBER CANARY_GROUP_SIZE
+export ROOT_DIR LIB_DIR INCLUDE_DIR CC CFLAGS SYS_CALL_TABLE_ADDRESS SYS_CALL_NUMBER CANARY_GROUP_SIZE SYS_CANARY_INIT_NUMBER
 
 all:
 	${MAKE} -C src/heapsentryu
