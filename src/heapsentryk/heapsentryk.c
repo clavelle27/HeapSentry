@@ -58,6 +58,7 @@ asmlinkage long heapsentryk_open(const char __user * a1, int a2, umode_t a3);
 asmlinkage long heapsentryk_getpid(void);
 asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 				  int __user * a3, int __user * a4, int a5);
+asmlinkage long heapsentryk_exit (int a1);
 
 void set_read_write(long unsigned int _addr);
 asmlinkage Canary_entry *find_hashtable_entry(size_t canary_location, struct
@@ -74,22 +75,19 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 asmlinkage void iterate_pid_list(void);
 asmlinkage int verify_canaries(void);
 
-asmlinkage int heapsentryk_exit(int status)
+asmlinkage long heapsentryk_exit (int a1)
 {
 	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
 	printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n",
 	       original_getpid());
-	free_canaries();
-	printk("after cleanup iterating started\n");
-	if (p_pid_entry) {
-		list_canaries(p_pid_entry->p_process_hashtable);
-	}
-	printk("after cleanup iterating ended\n");
-
-	//TODO:
-	// Remove the entry of process from linked list.
 	// Clean up the hashtable entries.
-	return original_exit(status);
+	free_canaries();
+
+	// Remove the entry of process from linked list.
+	if(p_pid_entry){
+		list_del(&p_pid_entry->pid_list_head);
+	}
+	return original_exit(a1);
 }
 
 asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
@@ -365,8 +363,8 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_open] = heapsentryk_open;
 	sys_call_table[__NR_execve] = heapsentryk_execve;
 	sys_call_table[__NR_chmod] = heapsentryk_chmod;
-	sys_call_table[__NR_exit_group] = heapsentryk_exit;
 	sys_call_table[__NR_clone] = heapsentryk_clone;
+	sys_call_table[__NR_exit_group] = heapsentryk_exit;
 
 	// Setting HeapSentryu's sys_canary() to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
