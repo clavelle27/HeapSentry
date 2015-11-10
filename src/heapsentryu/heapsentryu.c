@@ -123,9 +123,7 @@ size_t sys_canary()
 	// number in rax and triggers an interrupt.
 	//
 	// The output parameter is stored into the variable 'r' via rax.
-	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
-			     "D"((size_t) p_group_buffer), "S"(n),
-			     "d"((size_t) &group_count):"cc", "memory");
+	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n):"cc", "memory");
 	return r;
 }
 

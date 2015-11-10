@@ -75,7 +75,7 @@ asmlinkage Canary_entry *list_canaries(struct
 				       hlist_head (*hashtable)[1 <<
 							       BUCKET_BITS_SIZE]);
 asmlinkage Pid_entry *find_pid_entry(int pid);
-asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3);
+asmlinkage size_t sys_heapsentryk_canary(void);
 asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3);
 
@@ -188,10 +188,8 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 // System call which receives the canary information from heapsentryu
 // and stores it in its symbol table. This information is used by
 // high-risk calls to verify the canaries.
-asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
+asmlinkage size_t sys_heapsentryk_canary(void)
 {
-	size_t *p_group_buffer = (size_t *) v2;
-	size_t *p_group_count = (size_t *) v3;
 	struct hlist_head (*p_hash)[1 << BUCKET_BITS_SIZE] = NULL;
 
 	Pid_entry *p_pid_entry = NULL;
@@ -202,16 +200,17 @@ asmlinkage size_t sys_heapsentryk_canary(size_t not_used, size_t v2, size_t v3)
 	   *(p_group_buffer + i * 2 + 1),
 	   *((size_t *) * (p_group_buffer + i * 2)));
 	 */
-	printk
-	    ("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
-	     p_group_buffer, p_group_count);
-	printk("heapsentryk: dereferencing p_group_count:[%d]\n",
-	       *p_group_count);
 
 	// Checking if there is an entry in the linked list corresponding to the current process.
 	p_pid_entry = find_pid_entry(original_getpid());
+
 	if (p_pid_entry) {
 		size_t i = 0;
+	printk
+	    ("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
+	     p_pid_entry->p_group_buffer, p_pid_entry->p_group_count);
+	printk("heapsentryk: dereferencing p_group_count:[%d]\n",
+	       *p_pid_entry->p_group_count);
 
 		printk("Found pid_entry:%p found for pid:%ld\n", p_pid_entry,
 		       original_getpid());
