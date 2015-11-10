@@ -60,16 +60,6 @@ asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 				  int __user * a3, int __user * a4, int a5);
 
 void set_read_write(long unsigned int _addr);
-
-asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
-				  int __user * a3, int __user * a4, int a5)
-{
-
-	//printk(KERN_INFO
-	//       "Entered heapsentryk_clone() clone clone clone clone clone clone clone\n");
-	return original_clone(a1, a2, a3, a4, a5);
-}
-
 asmlinkage Canary_entry *find_hashtable_entry(size_t canary_location, struct
 					      hlist_head(*hashtable)[1 <<
 								     BUCKET_BITS_SIZE]);
@@ -81,6 +71,63 @@ asmlinkage size_t sys_heapsentryk_canary(void);
 asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3);
 asmlinkage void iterate_pid_list(void);
+asmlinkage int verify_canaries(void);
+
+asmlinkage int heapsentryk_exit(int status)
+{
+	//printk(KERN_INFO "Entered heapsentryk_exit(): pid:%ld\n",
+	//       original_getpid());
+	
+	//TODO:
+	// Remove the entry of process from linked list.
+	// Clean up the hashtable entries.
+	return original_exit(status);
+}
+
+asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
+				  int __user * a3, int __user * a4, int a5)
+{
+
+	//printk(KERN_INFO
+	//       "Entered heapsentryk_clone() clone clone clone clone clone clone clone\n");
+	if (verify_canaries()) {
+		original_exit(1);
+	}
+	return original_clone(a1, a2, a3, a4, a5);
+}
+
+asmlinkage long heapsentryk_execve(const char __user * a1,
+				   const char __user * const __user * a2,
+				   const char __user * const __user * a3)
+{
+	//printk(KERN_INFO "Entered heapsentryk_execve()\n");
+	if (verify_canaries()) {
+		original_exit(1);
+	}
+	return original_execve(a1, a2, a3);
+}
+
+asmlinkage long heapsentryk_open(const char __user * a1, int a2, umode_t a3)
+{
+	//printk(KERN_INFO "Entered heapsentryk_open()\n");
+	if (verify_canaries()) {
+		original_exit(1);
+	}
+	return original_open(a1, a2, a3);
+}
+
+asmlinkage long heapsentryk_chmod(const char __user * a1, umode_t a2)
+{
+	/*
+	   printk(KERN_INFO
+	   "Entered heapsentryk_chmod() chmod chmod chmod chmod chmod\n");
+	 */
+	if (verify_canaries()) {
+		original_exit(1);
+	}
+	return original_chmod(a1, a2);
+}
+
 
 asmlinkage void iterate_pid_list(void)
 {
@@ -164,7 +211,7 @@ asmlinkage int verify_canaries(void)
 		Canary_entry *p_canary_entry = NULL;
 		hash_for_each_rcu((*(p_pid_entry->p_process_hashtable)),
 				  bucket_index, p_canary_entry, next) {
-			if (p_canary_entry->canary_value !=
+			if (p_canary_entry->canary_value!=
 			    *((size_t *) p_canary_entry->canary_location)) {
 				printk(KERN_INFO
 				       "Canary verification failed. Forcing exit to ensure security!\n");
@@ -260,36 +307,6 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 		     original_getpid());
 	}
 	return 0;
-}
-
-asmlinkage int heapsentryk_exit(int status)
-{
-	//printk(KERN_INFO "Entered heapsentryk_exit(): pid:%ld\n",
-	//       original_getpid());
-	return original_exit(status);
-}
-
-asmlinkage long heapsentryk_execve(const char __user * a1,
-				   const char __user * const __user * a2,
-				   const char __user * const __user * a3)
-{
-	//printk(KERN_INFO "Entered heapsentryk_execve()\n");
-	return original_execve(a1, a2, a3);
-}
-
-asmlinkage long heapsentryk_open(const char __user * a1, int a2, umode_t a3)
-{
-	//printk(KERN_INFO "Entered heapsentryk_open()\n");
-	return original_open(a1, a2, a3);
-}
-
-asmlinkage long heapsentryk_chmod(const char __user * a1, umode_t a2)
-{
-	/*
-	   printk(KERN_INFO
-	   "Entered heapsentryk_chmod() chmod chmod chmod chmod chmod\n");
-	 */
-	return original_chmod(a1, a2);
 }
 
 // Init function of this kernel module. This gets executed when the module is
