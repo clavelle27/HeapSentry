@@ -61,11 +61,12 @@ asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 
 void set_read_write(long unsigned int _addr);
 asmlinkage Canary_entry *find_hashtable_entry(size_t canary_location, struct
-					      hlist_head(*hashtable)[1 <<
-								     BUCKET_BITS_SIZE]);
+					      hlist_head (*hashtable)[1 <<
+								      BUCKET_BITS_SIZE]);
 asmlinkage Canary_entry *list_canaries(struct
 				       hlist_head (*hashtable)[1 <<
 							       BUCKET_BITS_SIZE]);
+asmlinkage void free_canaries(void);
 asmlinkage Pid_entry *find_pid_entry(int pid);
 asmlinkage size_t sys_heapsentryk_canary(void);
 asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
@@ -75,9 +76,16 @@ asmlinkage int verify_canaries(void);
 
 asmlinkage int heapsentryk_exit(int status)
 {
+	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
 	printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n",
 	       original_getpid());
-	
+	free_canaries();
+	printk("after cleanup iterating started\n");
+	if (p_pid_entry) {
+		list_canaries(p_pid_entry->p_process_hashtable);
+	}
+	printk("after cleanup iterating ended\n");
+
 	//TODO:
 	// Remove the entry of process from linked list.
 	// Clean up the hashtable entries.
@@ -128,7 +136,6 @@ asmlinkage long heapsentryk_chmod(const char __user * a1, umode_t a2)
 	return original_chmod(a1, a2);
 }
 
-
 asmlinkage void iterate_pid_list(void)
 {
 	struct list_head *position = NULL;
@@ -164,9 +171,26 @@ asmlinkage Pid_entry *find_pid_entry(int pid)
 	return entry;
 }
 
+asmlinkage void free_canaries(void)
+{
+	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
+	if (p_pid_entry) {
+		int bucket_index = 0;
+		Canary_entry *p_canary_entry = NULL;
+		hash_for_each_rcu((*p_pid_entry->p_process_hashtable),
+				  bucket_index, p_canary_entry, next) {
+			// Removing the entries from hashtable
+			hash_del_rcu(&p_canary_entry->next);
+			// Free the memory belonging to hashtable entry.
+			kfree(p_canary_entry);
+		}
+
+	}
+}
+
 asmlinkage Canary_entry *list_canaries(struct
-				       hlist_head(*hashtable)[1 <<
-							      BUCKET_BITS_SIZE])
+				       hlist_head (*hashtable)[1 <<
+							       BUCKET_BITS_SIZE])
 {
 	Canary_entry *entry = NULL;
 	int bucket_index = 0;
@@ -211,7 +235,7 @@ asmlinkage int verify_canaries(void)
 		Canary_entry *p_canary_entry = NULL;
 		hash_for_each_rcu((*(p_pid_entry->p_process_hashtable)),
 				  bucket_index, p_canary_entry, next) {
-			if (p_canary_entry->canary_value!=
+			if (p_canary_entry->canary_value !=
 			    *((size_t *) p_canary_entry->canary_location)) {
 				printk(KERN_INFO
 				       "Canary verification failed. Forcing exit to ensure security!\n");
@@ -239,7 +263,7 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 	hash_init((*buckets));
 
 	// TODO: perform input validation:w
-	printk("canary_init called for pid:%ld\n",original_getpid());	
+	printk("canary_init called for pid:%ld\n", original_getpid());
 
 	p_pid_entry->p_group_buffer = p_group_buffer;
 	p_pid_entry->p_group_count = p_group_count;
