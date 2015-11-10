@@ -75,8 +75,8 @@ asmlinkage int verify_canaries(void);
 
 asmlinkage int heapsentryk_exit(int status)
 {
-	//printk(KERN_INFO "Entered heapsentryk_exit(): pid:%ld\n",
-	//       original_getpid());
+	printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n",
+	       original_getpid());
 	
 	//TODO:
 	// Remove the entry of process from linked list.
@@ -91,7 +91,7 @@ asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 	//printk(KERN_INFO
 	//       "Entered heapsentryk_clone() clone clone clone clone clone clone clone\n");
 	if (verify_canaries()) {
-		original_exit(1);
+		heapsentryk_exit(1);
 	}
 	return original_clone(a1, a2, a3, a4, a5);
 }
@@ -102,7 +102,7 @@ asmlinkage long heapsentryk_execve(const char __user * a1,
 {
 	//printk(KERN_INFO "Entered heapsentryk_execve()\n");
 	if (verify_canaries()) {
-		original_exit(1);
+		heapsentryk_exit(1);
 	}
 	return original_execve(a1, a2, a3);
 }
@@ -111,7 +111,7 @@ asmlinkage long heapsentryk_open(const char __user * a1, int a2, umode_t a3)
 {
 	//printk(KERN_INFO "Entered heapsentryk_open()\n");
 	if (verify_canaries()) {
-		original_exit(1);
+		heapsentryk_exit(1);
 	}
 	return original_open(a1, a2, a3);
 }
@@ -123,7 +123,7 @@ asmlinkage long heapsentryk_chmod(const char __user * a1, umode_t a2)
 	   "Entered heapsentryk_chmod() chmod chmod chmod chmod chmod\n");
 	 */
 	if (verify_canaries()) {
-		original_exit(1);
+		heapsentryk_exit(1);
 	}
 	return original_chmod(a1, a2);
 }
@@ -239,6 +239,7 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 	hash_init((*buckets));
 
 	// TODO: perform input validation:w
+	printk("canary_init called for pid:%ld\n",original_getpid());	
 
 	p_pid_entry->p_group_buffer = p_group_buffer;
 	p_pid_entry->p_group_count = p_group_count;
@@ -330,7 +331,7 @@ static int __init mod_entry_func(void)
 	original_open = sys_call_table[__NR_open];
 	original_chmod = sys_call_table[__NR_chmod];
 	original_getpid = sys_call_table[__NR_getpid];
-	original_exit = sys_call_table[__NR_exit];
+	original_exit = sys_call_table[__NR_exit_group];
 	original_clone = sys_call_table[__NR_clone];
 
 	// Substituting the system calls with heapsentryk's calls.
@@ -340,7 +341,7 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_open] = heapsentryk_open;
 	sys_call_table[__NR_execve] = heapsentryk_execve;
 	sys_call_table[__NR_chmod] = heapsentryk_chmod;
-	sys_call_table[__NR_exit] = heapsentryk_exit;
+	sys_call_table[__NR_exit_group] = heapsentryk_exit;
 	sys_call_table[__NR_clone] = heapsentryk_clone;
 
 	// Setting HeapSentryu's sys_canary() to sys_call_table to the configured index.
@@ -360,7 +361,7 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_execve] = original_execve;
 	sys_call_table[__NR_open] = original_open;
 	sys_call_table[__NR_chmod] = original_chmod;
-	sys_call_table[__NR_exit] = original_exit;
+	sys_call_table[__NR_exit_group] = original_exit;
 	sys_call_table[__NR_clone] = original_clone;
 
 	sys_call_table[SYS_CALL_NUMBER] = 0;
