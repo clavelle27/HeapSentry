@@ -39,6 +39,7 @@ typedef struct canary_entry {
 	struct hlist_node next;
 } Canary_entry;
 
+asmlinkage long (*original_fchmod) (unsigned int a1, umode_t a2);
 asmlinkage long (*original_chmod) (const char __user * a1, umode_t a2);
 asmlinkage long (*original_execve) (const char __user * a1,
 				    const char __user * const __user * a2,
@@ -50,6 +51,7 @@ asmlinkage long (*original_exit) (int a1);
 asmlinkage long (*original_clone) (unsigned long a1, unsigned long a2,
 				   int __user * a3, int __user * a4, int a5);
 
+asmlinkage long heapsentryk_fchmod (unsigned int a1, umode_t a2);
 asmlinkage long heapsentryk_chmod(const char __user * a1, umode_t a2);
 asmlinkage long heapsentryk_execve(const char __user * a1,
 				   const char __user * const __user * a2,
@@ -74,6 +76,16 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3);
 asmlinkage void iterate_pid_list(void);
 asmlinkage int verify_canaries(void);
+
+asmlinkage long heapsentryk_fchmod (unsigned int a1, umode_t a2)
+{
+	printk(KERN_INFO "Entered heapsentryk_fchmod pid:%ld\n",
+	       original_getpid());
+	if (verify_canaries()) {
+		heapsentryk_exit(1);
+	}
+	return original_fchmod(a1,a2);
+}
 
 asmlinkage long heapsentryk_exit (int a1)
 {
@@ -254,7 +266,7 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 	struct hlist_head (*buckets)[1 << BUCKET_BITS_SIZE] =
 	    (struct hlist_head(*)[1 << BUCKET_BITS_SIZE])
 	    kmalloc(sizeof
-		    (struct hlist_head (*)[1 << BUCKET_BITS_SIZE]), GFP_KERNEL);
+		    (struct hlist_head) *(1 << BUCKET_BITS_SIZE), GFP_KERNEL);
 	// Braces are added to void bugs that could arise by macro substitutions.
 	// Since there is an asterisk in the argument, if the macro places the
 	// argument as a suffix, there will be a problem.
@@ -355,6 +367,7 @@ static int __init mod_entry_func(void)
 	original_getpid = sys_call_table[__NR_getpid];
 	original_exit = sys_call_table[__NR_exit_group];
 	original_clone = sys_call_table[__NR_clone];
+	original_fchmod = sys_call_table[__NR_fchmod];
 
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
@@ -365,6 +378,7 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_chmod] = heapsentryk_chmod;
 	sys_call_table[__NR_clone] = heapsentryk_clone;
 	sys_call_table[__NR_exit_group] = heapsentryk_exit;
+	sys_call_table[__NR_fchmod] = heapsentryk_fchmod;
 
 	// Setting HeapSentryu's sys_canary() to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
@@ -385,6 +399,7 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_chmod] = original_chmod;
 	sys_call_table[__NR_exit_group] = original_exit;
 	sys_call_table[__NR_clone] = original_clone;
+	sys_call_table[__NR_fchmod] = original_fchmod;
 
 	sys_call_table[SYS_CALL_NUMBER] = 0;
 	sys_call_table[SYS_CANARY_INIT_NUMBER] = 0;
