@@ -23,9 +23,15 @@ void **sys_call_table;
 // Define a linked list that holds information that connects PID with a process specific hashtable
 LIST_HEAD(pid_list);
 
+typedef struct malloc_info {
+	size_t *malloc_location;
+	size_t *canary_location;
+	size_t canary;
+} Malloc_info;
+
 // The object that the link list holds.
 typedef struct pid_entry {
-	size_t *p_group_buffer;
+	Malloc_info *p_group_buffer;
 	size_t *p_group_count;
 	long pid;
 	struct hlist_head (*p_process_hashtable)[1 << BUCKET_BITS_SIZE];
@@ -34,8 +40,7 @@ typedef struct pid_entry {
 
 // The object identified by a key(canary_location) in hashtable which holds canary information.
 typedef struct canary_entry {
-	size_t canary_location;
-	size_t canary_value;
+	Malloc_info minfo;
 	struct hlist_node next;
 } Canary_entry;
 
@@ -80,7 +85,7 @@ asmlinkage long heapsentryk_exit(int a1);
 asmlinkage long heapsentryk_exit_group(int a1);
 
 void set_read_write(long unsigned int _addr);
-asmlinkage Canary_entry *find_hashtable_entry(size_t canary_location, struct
+asmlinkage Canary_entry *find_hashtable_entry(size_t * malloc_location, struct
 					      hlist_head (*hashtable)[1 <<
 								      BUCKET_BITS_SIZE]);
 asmlinkage Canary_entry *list_canaries(struct
@@ -176,7 +181,11 @@ asmlinkage long heapsentryk_exit_group(int a1)
 	// Remove the entry of process from linked list.
 	if (p_pid_entry) {
 		list_del(&p_pid_entry->pid_list_head);
+		kfree(p_pid_entry);
+		// Avoid dangling pointers
+		p_pid_entry = NULL;
 	}
+
 	return original_exit_group(a1);
 }
 
@@ -292,16 +301,17 @@ asmlinkage Canary_entry *list_canaries(struct
 	Canary_entry *p_canary_entry = NULL;
 	hash_for_each_rcu((*hashtable), bucket_index, p_canary_entry, next) {
 		printk(KERN_INFO
-		       "canary_location=%d canary_value=%d deref=%d is in bucket %d\n",
-		       p_canary_entry->canary_location,
-		       p_canary_entry->canary_value,
-		       *((size_t *) p_canary_entry->canary_location),
+		       "malloc_location=%p canary_location=%p canary=%d deref=%d is in bucket %d\n",
+		       p_canary_entry->minfo.malloc_location,
+		       p_canary_entry->minfo.canary_location,
+		       p_canary_entry->minfo.canary,
+		       *((size_t *) p_canary_entry->minfo.canary_location),
 		       bucket_index);
 	}
 	return entry;
 }
 
-asmlinkage Canary_entry *find_hashtable_entry(size_t canary_location, struct
+asmlinkage Canary_entry *find_hashtable_entry(size_t * malloc_location, struct
 					      hlist_head(*hashtable)[1 <<
 								     BUCKET_BITS_SIZE])
 {
@@ -313,8 +323,7 @@ asmlinkage Canary_entry *find_hashtable_entry(size_t canary_location, struct
 
 	hash_for_each_rcu((*p_pid_entry->p_process_hashtable), bucket_index,
 			  p_canary_entry, next) {
-		if (p_canary_entry->canary_value ==
-		    *((size_t *) p_canary_entry->canary_location)) {
+		if (p_canary_entry->minfo.malloc_location == malloc_location) {
 			entry = p_canary_entry;
 			break;
 		}
@@ -330,8 +339,9 @@ asmlinkage int verify_canaries(void)
 		Canary_entry *p_canary_entry = NULL;
 		hash_for_each_rcu((*(p_pid_entry->p_process_hashtable)),
 				  bucket_index, p_canary_entry, next) {
-			if (p_canary_entry->canary_value !=
-			    *((size_t *) p_canary_entry->canary_location)) {
+			if (p_canary_entry->minfo.canary !=
+			    *((size_t *) p_canary_entry->minfo.
+			      canary_location)) {
 				printk(KERN_INFO
 				       "Canary verification failed. Forcing exit to ensure security!\n");
 				return 1;
@@ -344,7 +354,7 @@ asmlinkage int verify_canaries(void)
 asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3)
 {
-	size_t *p_group_buffer = (size_t *) v2;
+	Malloc_info *p_group_buffer = (Malloc_info *) v2;
 	size_t *p_group_count = (size_t *) v3;
 	Pid_entry *p_pid_entry =
 	    (Pid_entry *) kmalloc(sizeof(Pid_entry), GFP_KERNEL);
@@ -368,7 +378,7 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 
 	list_add(&p_pid_entry->pid_list_head, &pid_list);
 
-	//Testing
+	//TODO: Testing only. remove this code.
 	printk("testing init entry pid\n");
 	iterate_pid_list();
 	printk("testing init entry pid  ended\n");
@@ -411,13 +421,23 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 			    (Canary_entry *) kmalloc(sizeof(Canary_entry),
 						     GFP_KERNEL);
 			memset((void *)entry, 0, sizeof(Canary_entry));
-			entry->canary_location =
-			    *(p_pid_entry->p_group_buffer + i * 2);
-			entry->canary_value =
-			    *((size_t *) *
-			      (p_pid_entry->p_group_buffer + i * 2));
+			entry->minfo.malloc_location =
+			    p_pid_entry->p_group_buffer[i].malloc_location;
+			entry->minfo.canary_location =
+			    p_pid_entry->p_group_buffer[i].canary_location;
+			entry->minfo.canary =
+			    p_pid_entry->p_group_buffer[i].canary;
+
+			/*
+			   entry->canary_location =
+			   *(p_pid_entry->p_group_buffer + i * 2);
+			   entry->canary_value =
+			   *((size_t *) *
+			   (p_pid_entry->p_group_buffer + i * 2));
+			 */
 			hash_add_rcu((*p_pid_entry->p_process_hashtable),
-				     &entry->next, entry->canary_location);
+				     &entry->next,
+				     ((size_t)entry->minfo.malloc_location));
 		}
 		p_hash = p_pid_entry->p_process_hashtable;
 		list_canaries(p_hash);

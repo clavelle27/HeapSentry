@@ -4,7 +4,13 @@
 #define __USE_GNU
 #include <dlfcn.h>
 
-size_t *p_group_buffer;
+typedef struct malloc_info {
+	size_t *malloc_location;
+	size_t *canary_location;
+	size_t canary;
+} Malloc_info;
+
+Malloc_info *p_group_buffer;
 size_t group_count = 0;
 // These are the function pointers used to hold the address of 
 // actual system calls. The syntax of these function pointers
@@ -39,7 +45,7 @@ void *malloc(size_t size)
 	// to kernel when it gets filled.
 	if (!p_group_buffer) {
 		p_group_buffer =
-		    (size_t *) rmalloc(CANARY_GROUP_SIZE * 2 * sizeof(size_t));
+		    (Malloc_info *) rmalloc(CANARY_GROUP_SIZE * sizeof(Malloc_info));
 	}
 
 
@@ -51,7 +57,7 @@ void *malloc(size_t size)
 	char *obj = (char *)rmalloc(modified_size);
 
 	// Determining the canary location to store the random number and casting it to int*.
-	int *canary_location = (int *)(obj + size);
+	size_t *canary_location = (size_t *)(obj + size);
 
 	// Setting the seed for random number generation. This happens once per library load.
 	heapsentryu_init();
@@ -62,13 +68,20 @@ void *malloc(size_t size)
 	// Saving the canary at its designated location.
 	*canary_location = canary;
 
+	p_group_buffer[group_count].malloc_location = (size_t*) obj;
+	p_group_buffer[group_count].canary_location = canary_location;
+	p_group_buffer[group_count].canary = canary;
+
+	printf("malloc_location:%p canary_location:%p canary:%d\n", p_group_buffer[group_count].malloc_location, p_group_buffer[group_count].canary_location, p_group_buffer[group_count].canary);
+	/*
 	*(p_group_buffer + group_count * 2) = (size_t) canary_location;
 	*(p_group_buffer + group_count * 2 + 1) = (size_t) canary;
 	printf("p_group_buffer[%d][0]: %d\n", group_count,
 	       (int)*(p_group_buffer + group_count * 2));
 	printf("p_group_buffer[%d][1]: %d\n", group_count,
 	       (int)*(p_group_buffer + group_count * 2 + 1));
-	(group_count)++;
+	*/
+	group_count++;
 
 	if (group_count == CANARY_GROUP_SIZE) {
 		sys_canary();
