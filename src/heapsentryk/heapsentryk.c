@@ -50,8 +50,8 @@ asmlinkage long (*original_execve) (const char __user * a1,
 				    const char __user * const __user * a3);
 asmlinkage long (*original_open) (const char __user * a1, int a2, umode_t a3);
 asmlinkage long (*original_exit) (int a1);
+asmlinkage long (*original_exit_group) (int a1);
 asmlinkage long (*original_getpid) (void);
-asmlinkage long (*original_exit) (int a1);
 asmlinkage long (*original_clone) (unsigned long a1, unsigned long a2,
 				   int __user * a3, int __user * a4, int a5);
 
@@ -69,6 +69,7 @@ asmlinkage long heapsentryk_getpid(void);
 asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 				  int __user * a3, int __user * a4, int a5);
 asmlinkage long heapsentryk_exit (int a1);
+asmlinkage long heapsentryk_exit_group (int a1);
 
 void set_read_write(long unsigned int _addr);
 asmlinkage Canary_entry *find_hashtable_entry(size_t canary_location, struct
@@ -105,6 +106,7 @@ asmlinkage long heapsentryk_fork(void)
 	}
 	return original_fork();
 }
+
 asmlinkage long heapsentryk_fchmodat (int a1, const char __user * a2,
 			     umode_t a3)
 {
@@ -126,10 +128,10 @@ asmlinkage long heapsentryk_fchmod (unsigned int a1, umode_t a2)
 	return original_fchmod(a1,a2);
 }
 
-asmlinkage long heapsentryk_exit (int a1)
+asmlinkage long heapsentryk_exit_group (int a1)
 {
 	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
-	printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n",
+	printk(KERN_INFO "Entered heapsentryk_exit_group pid:%ld\n",
 	       original_getpid());
 	// Clean up the hashtable entries.
 	free_canaries();
@@ -138,6 +140,12 @@ asmlinkage long heapsentryk_exit (int a1)
 	if(p_pid_entry){
 		list_del(&p_pid_entry->pid_list_head);
 	}
+	return original_exit_group(a1);
+}
+
+asmlinkage long heapsentryk_exit (int a1)
+{
+	printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n", original_getpid());
 	return original_exit(a1);
 }
 
@@ -404,7 +412,8 @@ static int __init mod_entry_func(void)
 	original_open = sys_call_table[__NR_open];
 	original_chmod = sys_call_table[__NR_chmod];
 	original_getpid = sys_call_table[__NR_getpid];
-	original_exit = sys_call_table[__NR_exit_group];
+	original_exit = sys_call_table[__NR_exit];
+	original_exit_group = sys_call_table[__NR_exit_group];
 	original_clone = sys_call_table[__NR_clone];
 	original_fchmod = sys_call_table[__NR_fchmod];
 	original_fchmodat = sys_call_table[__NR_fchmodat];
@@ -419,7 +428,8 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_execve] = heapsentryk_execve;
 	sys_call_table[__NR_chmod] = heapsentryk_chmod;
 	sys_call_table[__NR_clone] = heapsentryk_clone;
-	sys_call_table[__NR_exit_group] = heapsentryk_exit;
+	sys_call_table[__NR_exit_group] = heapsentryk_exit_group;
+	sys_call_table[__NR_exit] = heapsentryk_exit;
 	sys_call_table[__NR_fchmod] = heapsentryk_fchmod;
 	sys_call_table[__NR_fchmodat] = heapsentryk_fchmodat;
 	sys_call_table[__NR_fork] = heapsentryk_fork;
@@ -442,7 +452,8 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_execve] = original_execve;
 	sys_call_table[__NR_open] = original_open;
 	sys_call_table[__NR_chmod] = original_chmod;
-	sys_call_table[__NR_exit_group] = original_exit;
+	sys_call_table[__NR_exit_group] = original_exit_group;
+	sys_call_table[__NR_exit] = original_exit;
 	sys_call_table[__NR_clone] = original_clone;
 	sys_call_table[__NR_fchmod] = original_fchmod;
 	sys_call_table[__NR_fchmodat] = original_fchmodat;
