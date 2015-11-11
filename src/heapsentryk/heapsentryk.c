@@ -40,6 +40,7 @@ typedef struct canary_entry {
 } Canary_entry;
 
 asmlinkage long (*original_fork)(void);
+asmlinkage long (*original_vfork)(void);
 asmlinkage long (*original_fchmodat) (int a1, const char __user * a2,
 			     umode_t a3);
 asmlinkage long (*original_fchmod) (unsigned int a1, umode_t a2);
@@ -55,6 +56,7 @@ asmlinkage long (*original_clone) (unsigned long a1, unsigned long a2,
 				   int __user * a3, int __user * a4, int a5);
 
 asmlinkage long heapsentryk_fork(void);
+asmlinkage long heapsentryk_vfork(void);
 asmlinkage long heapsentryk_fchmodat (int a1, const char __user * a2,
 			     umode_t a3);
 asmlinkage long heapsentryk_fchmod (unsigned int a1, umode_t a2);
@@ -82,6 +84,17 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3);
 asmlinkage void iterate_pid_list(void);
 asmlinkage int verify_canaries(void);
+
+asmlinkage long heapsentryk_vfork(void)
+{
+	printk(KERN_INFO "Entered heapsentryk_vfork pid:%ld\n",
+	       original_getpid());
+	if (verify_canaries()) {
+		heapsentryk_exit(1);
+	}
+	return original_vfork();
+}
+
 
 asmlinkage long heapsentryk_fork(void)
 {
@@ -396,6 +409,7 @@ static int __init mod_entry_func(void)
 	original_fchmod = sys_call_table[__NR_fchmod];
 	original_fchmodat = sys_call_table[__NR_fchmodat];
 	original_fork = sys_call_table[__NR_fork];
+	original_vfork = sys_call_table[__NR_vfork];
 
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
@@ -409,6 +423,7 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_fchmod] = heapsentryk_fchmod;
 	sys_call_table[__NR_fchmodat] = heapsentryk_fchmodat;
 	sys_call_table[__NR_fork] = heapsentryk_fork;
+	sys_call_table[__NR_vfork] = heapsentryk_vfork;
 
 	// Setting HeapSentryu's sys_canary() to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
@@ -432,6 +447,7 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_fchmod] = original_fchmod;
 	sys_call_table[__NR_fchmodat] = original_fchmodat;
 	sys_call_table[__NR_fork] = original_fork;
+	sys_call_table[__NR_vfork] = original_vfork;
 
 	sys_call_table[SYS_CALL_NUMBER] = 0;
 	sys_call_table[SYS_CANARY_INIT_NUMBER] = 0;
