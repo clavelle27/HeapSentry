@@ -39,6 +39,7 @@ typedef struct canary_entry {
 	struct hlist_node next;
 } Canary_entry;
 
+asmlinkage long (*original_creat) (const char __user *a1, umode_t a2);
 asmlinkage long (*original_fork)(void);
 asmlinkage long (*original_vfork)(void);
 asmlinkage long (*original_fchmodat) (int a1, const char __user * a2,
@@ -55,6 +56,7 @@ asmlinkage long (*original_getpid) (void);
 asmlinkage long (*original_clone) (unsigned long a1, unsigned long a2,
 				   int __user * a3, int __user * a4, int a5);
 
+asmlinkage long heapsentryk_creat (const char __user *a1, umode_t a2);
 asmlinkage long heapsentryk_fork(void);
 asmlinkage long heapsentryk_vfork(void);
 asmlinkage long heapsentryk_fchmodat (int a1, const char __user * a2,
@@ -85,6 +87,17 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3);
 asmlinkage void iterate_pid_list(void);
 asmlinkage int verify_canaries(void);
+
+
+asmlinkage long heapsentryk_creat (const char __user *a1, umode_t a2)
+{
+	printk(KERN_INFO "Entered heapsentryk_creat pid:%ld\n",
+	       original_getpid());
+	if (verify_canaries()) {
+		heapsentryk_exit(1);
+	}
+	return original_creat(a1, a2);
+}
 
 asmlinkage long heapsentryk_vfork(void)
 {
