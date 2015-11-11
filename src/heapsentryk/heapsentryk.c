@@ -39,13 +39,14 @@ typedef struct canary_entry {
 	struct hlist_node next;
 } Canary_entry;
 
-asmlinkage long (*original_openat) (int a1, const char __user *a2, int a3,
-			   umode_t a4);
-asmlinkage long (*original_creat) (const char __user *a1, umode_t a2);
-asmlinkage long (*original_fork)(void);
-asmlinkage long (*original_vfork)(void);
+asmlinkage long (*original_open_by_handle_at) (int a1, void *a2, int a3);
+asmlinkage long (*original_openat) (int a1, const char __user * a2, int a3,
+				    umode_t a4);
+asmlinkage long (*original_creat) (const char __user * a1, umode_t a2);
+asmlinkage long (*original_fork) (void);
+asmlinkage long (*original_vfork) (void);
 asmlinkage long (*original_fchmodat) (int a1, const char __user * a2,
-			     umode_t a3);
+				      umode_t a3);
 asmlinkage long (*original_fchmod) (unsigned int a1, umode_t a2);
 asmlinkage long (*original_chmod) (const char __user * a1, umode_t a2);
 asmlinkage long (*original_execve) (const char __user * a1,
@@ -58,14 +59,15 @@ asmlinkage long (*original_getpid) (void);
 asmlinkage long (*original_clone) (unsigned long a1, unsigned long a2,
 				   int __user * a3, int __user * a4, int a5);
 
-asmlinkage long heapsentryk_openat (int a1, const char __user *a2, int a3,
-			   umode_t a4);
-asmlinkage long heapsentryk_creat (const char __user *a1, umode_t a2);
+asmlinkage long heapsentryk_open_by_handle_at(int a1, void *a2, int a3);
+asmlinkage long heapsentryk_openat(int a1, const char __user * a2, int a3,
+				   umode_t a4);
+asmlinkage long heapsentryk_creat(const char __user * a1, umode_t a2);
 asmlinkage long heapsentryk_fork(void);
 asmlinkage long heapsentryk_vfork(void);
-asmlinkage long heapsentryk_fchmodat (int a1, const char __user * a2,
-			     umode_t a3);
-asmlinkage long heapsentryk_fchmod (unsigned int a1, umode_t a2);
+asmlinkage long heapsentryk_fchmodat(int a1, const char __user * a2,
+				     umode_t a3);
+asmlinkage long heapsentryk_fchmod(unsigned int a1, umode_t a2);
 asmlinkage long heapsentryk_chmod(const char __user * a1, umode_t a2);
 asmlinkage long heapsentryk_execve(const char __user * a1,
 				   const char __user * const __user * a2,
@@ -74,8 +76,8 @@ asmlinkage long heapsentryk_open(const char __user * a1, int a2, umode_t a3);
 asmlinkage long heapsentryk_getpid(void);
 asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 				  int __user * a3, int __user * a4, int a5);
-asmlinkage long heapsentryk_exit (int a1);
-asmlinkage long heapsentryk_exit_group (int a1);
+asmlinkage long heapsentryk_exit(int a1);
+asmlinkage long heapsentryk_exit_group(int a1);
 
 void set_read_write(long unsigned int _addr);
 asmlinkage Canary_entry *find_hashtable_entry(size_t canary_location, struct
@@ -92,9 +94,18 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 asmlinkage void iterate_pid_list(void);
 asmlinkage int verify_canaries(void);
 
+asmlinkage long heapsentryk_open_by_handle_at(int a1, void *a2, int a3)
+{
+	printk(KERN_INFO "Entered heapsentryk_open_by_handle_at pid:%ld\n",
+	       original_getpid());
+	if (verify_canaries()) {
+		heapsentryk_exit(1);
+	}
+	return original_open_by_handle_at(a1, a2, a3);
+}
 
-asmlinkage long heapsentryk_openat (int a1, const char __user *a2, int a3,
-			   umode_t a4)
+asmlinkage long heapsentryk_openat(int a1, const char __user * a2, int a3,
+				   umode_t a4)
 {
 	printk(KERN_INFO "Entered heapsentryk_openat pid:%ld\n",
 	       original_getpid());
@@ -104,7 +115,7 @@ asmlinkage long heapsentryk_openat (int a1, const char __user *a2, int a3,
 	return original_openat(a1, a2, a3, a4);
 }
 
-asmlinkage long heapsentryk_creat (const char __user *a1, umode_t a2)
+asmlinkage long heapsentryk_creat(const char __user * a1, umode_t a2)
 {
 	printk(KERN_INFO "Entered heapsentryk_creat pid:%ld\n",
 	       original_getpid());
@@ -124,7 +135,6 @@ asmlinkage long heapsentryk_vfork(void)
 	return original_vfork();
 }
 
-
 asmlinkage long heapsentryk_fork(void)
 {
 	printk(KERN_INFO "Entered heapsentryk_fork pid:%ld\n",
@@ -135,28 +145,27 @@ asmlinkage long heapsentryk_fork(void)
 	return original_fork();
 }
 
-asmlinkage long heapsentryk_fchmodat (int a1, const char __user * a2,
-			     umode_t a3)
+asmlinkage long heapsentryk_fchmodat(int a1, const char __user * a2, umode_t a3)
 {
 	printk(KERN_INFO "Entered heapsentryk_fchmodat pid:%ld\n",
 	       original_getpid());
 	if (verify_canaries()) {
 		heapsentryk_exit(1);
 	}
-	return original_fchmodat(a1,a2,a3);
+	return original_fchmodat(a1, a2, a3);
 }
 
-asmlinkage long heapsentryk_fchmod (unsigned int a1, umode_t a2)
+asmlinkage long heapsentryk_fchmod(unsigned int a1, umode_t a2)
 {
 	printk(KERN_INFO "Entered heapsentryk_fchmod pid:%ld\n",
 	       original_getpid());
 	if (verify_canaries()) {
 		heapsentryk_exit(1);
 	}
-	return original_fchmod(a1,a2);
+	return original_fchmod(a1, a2);
 }
 
-asmlinkage long heapsentryk_exit_group (int a1)
+asmlinkage long heapsentryk_exit_group(int a1)
 {
 	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
 	printk(KERN_INFO "Entered heapsentryk_exit_group pid:%ld\n",
@@ -165,15 +174,16 @@ asmlinkage long heapsentryk_exit_group (int a1)
 	free_canaries();
 
 	// Remove the entry of process from linked list.
-	if(p_pid_entry){
+	if (p_pid_entry) {
 		list_del(&p_pid_entry->pid_list_head);
 	}
 	return original_exit_group(a1);
 }
 
-asmlinkage long heapsentryk_exit (int a1)
+asmlinkage long heapsentryk_exit(int a1)
 {
-	printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n", original_getpid());
+	printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n",
+	       original_getpid());
 	return original_exit(a1);
 }
 
@@ -341,7 +351,7 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 	struct hlist_head (*buckets)[1 << BUCKET_BITS_SIZE] =
 	    (struct hlist_head(*)[1 << BUCKET_BITS_SIZE])
 	    kmalloc(sizeof
-		    (struct hlist_head) *(1 << BUCKET_BITS_SIZE), GFP_KERNEL);
+		    (struct hlist_head) * (1 << BUCKET_BITS_SIZE), GFP_KERNEL);
 	// Braces are added to void bugs that could arise by macro substitutions.
 	// Since there is an asterisk in the argument, if the macro places the
 	// argument as a suffix, there will be a problem.
@@ -448,6 +458,7 @@ static int __init mod_entry_func(void)
 	original_fork = sys_call_table[__NR_fork];
 	original_vfork = sys_call_table[__NR_vfork];
 	original_openat = sys_call_table[__NR_openat];
+	original_open_by_handle_at = sys_call_table[__NR_open_by_handle_at];
 
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
@@ -464,6 +475,7 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_fork] = heapsentryk_fork;
 	sys_call_table[__NR_vfork] = heapsentryk_vfork;
 	sys_call_table[__NR_openat] = heapsentryk_openat;
+	sys_call_table[__NR_open_by_handle_at] = heapsentryk_open_by_handle_at;
 
 	// Setting HeapSentryu's sys_canary() to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
@@ -490,6 +502,7 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_fork] = original_fork;
 	sys_call_table[__NR_vfork] = original_vfork;
 	sys_call_table[__NR_openat] = original_openat;
+	sys_call_table[__NR_open_by_handle_at] = original_open_by_handle_at;
 
 	sys_call_table[SYS_CALL_NUMBER] = 0;
 	sys_call_table[SYS_CANARY_INIT_NUMBER] = 0;
