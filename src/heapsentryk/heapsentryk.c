@@ -85,9 +85,7 @@ asmlinkage long heapsentryk_exit(int a1);
 asmlinkage long heapsentryk_exit_group(int a1);
 
 void set_read_write(long unsigned int _addr);
-asmlinkage Canary_entry *find_hashtable_entry(size_t * malloc_location, struct
-					      hlist_head (*hashtable)[1 <<
-								      BUCKET_BITS_SIZE]);
+asmlinkage int remove_hashtable_entry(size_t * malloc_location);
 asmlinkage Canary_entry *list_canaries(struct
 				       hlist_head (*hashtable)[1 <<
 							       BUCKET_BITS_SIZE]);
@@ -313,11 +311,8 @@ asmlinkage Canary_entry *list_canaries(struct
 	return entry;
 }
 
-asmlinkage Canary_entry *find_hashtable_entry(size_t * malloc_location, struct
-					      hlist_head(*hashtable)[1 <<
-								     BUCKET_BITS_SIZE])
+asmlinkage int remove_hashtable_entry(size_t * malloc_location)
 {
-	Canary_entry *entry = NULL;
 	int bucket_index = 0;
 	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
 
@@ -326,11 +321,13 @@ asmlinkage Canary_entry *find_hashtable_entry(size_t * malloc_location, struct
 	hash_for_each_rcu((*p_pid_entry->p_process_hashtable), bucket_index,
 			  p_canary_entry, next) {
 		if (p_canary_entry->minfo.malloc_location == malloc_location) {
-			entry = p_canary_entry;
+			printk("Heapsentryk: removing obj:%p\n",p_canary_entry->minfo.malloc_location);
+			hash_del_rcu(&p_canary_entry->next);
+			kfree(p_canary_entry);
 			break;
 		}
 	}
-	return entry;
+	return 0;
 }
 
 asmlinkage int verify_canaries(void)
@@ -358,6 +355,7 @@ asmlinkage size_t sys_heapsentryk_canary_free(size_t not_used, size_t v2, size_t
 {
 	size_t* obj = (size_t*) v2;
 	printk(KERN_INFO "sys_heapsentryk_canary_free entered: obj:%p\n",obj);
+	remove_hashtable_entry(obj);
 	return 0;
 }
 
@@ -400,13 +398,6 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 
 	Pid_entry *p_pid_entry = NULL;
 
-	/*
-	   printk("buf[%d][0]:[%p] buf[%d][1]:[%d] deref:[%d]\n", i,
-	   (void *)*(p_group_buffer + i * 2), i,
-	   *(p_group_buffer + i * 2 + 1),
-	   *((size_t *) * (p_group_buffer + i * 2)));
-	 */
-
 	// Checking if there is an entry in the linked list corresponding to the current process.
 	p_pid_entry = find_pid_entry(original_getpid());
 
@@ -437,13 +428,6 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 			entry->minfo.canary =
 			    p_pid_entry->p_group_buffer[i].canary;
 
-			/*
-			   entry->canary_location =
-			   *(p_pid_entry->p_group_buffer + i * 2);
-			   entry->canary_value =
-			   *((size_t *) *
-			   (p_pid_entry->p_group_buffer + i * 2));
-			 */
 			hash_add_rcu((*p_pid_entry->p_process_hashtable),
 				     &entry->next,
 				     ((size_t)entry->minfo.malloc_location));
