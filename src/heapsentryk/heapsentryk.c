@@ -101,10 +101,10 @@ asmlinkage int verify_canaries(void);
 
 asmlinkage long heapsentryk_open_by_handle_at(int a1, void *a2, int a3)
 {
-	printk(KERN_INFO "Entered heapsentryk_open_by_handle_at pid:%ld\n",
-	       original_getpid());
+	//printk(KERN_INFO "Entered heapsentryk_open_by_handle_at pid:%ld\n",
+	//       original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_open_by_handle_at(a1, a2, a3);
 }
@@ -112,60 +112,60 @@ asmlinkage long heapsentryk_open_by_handle_at(int a1, void *a2, int a3)
 asmlinkage long heapsentryk_openat(int a1, const char __user * a2, int a3,
 				   umode_t a4)
 {
-	printk(KERN_INFO "Entered heapsentryk_openat pid:%ld\n",
-	       original_getpid());
+	//printk(KERN_INFO "Entered heapsentryk_openat pid:%ld\n",
+	//       original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_openat(a1, a2, a3, a4);
 }
 
 asmlinkage long heapsentryk_creat(const char __user * a1, umode_t a2)
 {
-	printk(KERN_INFO "Entered heapsentryk_creat pid:%ld\n",
-	       original_getpid());
+	//printk(KERN_INFO "Entered heapsentryk_creat pid:%ld\n",
+	//       original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_creat(a1, a2);
 }
 
 asmlinkage long heapsentryk_vfork(void)
 {
-	printk(KERN_INFO "Entered heapsentryk_vfork pid:%ld\n",
-	       original_getpid());
+	//printk(KERN_INFO "Entered heapsentryk_vfork pid:%ld\n",
+	//       original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_vfork();
 }
 
 asmlinkage long heapsentryk_fork(void)
 {
-	printk(KERN_INFO "Entered heapsentryk_fork pid:%ld\n",
-	       original_getpid());
+	//printk(KERN_INFO "Entered heapsentryk_fork pid:%ld\n",
+	//       original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_fork();
 }
 
 asmlinkage long heapsentryk_fchmodat(int a1, const char __user * a2, umode_t a3)
 {
-	printk(KERN_INFO "Entered heapsentryk_fchmodat pid:%ld\n",
-	       original_getpid());
+	//printk(KERN_INFO "Entered heapsentryk_fchmodat pid:%ld\n",
+	 //      original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_fchmodat(a1, a2, a3);
 }
 
 asmlinkage long heapsentryk_fchmod(unsigned int a1, umode_t a2)
 {
-	printk(KERN_INFO "Entered heapsentryk_fchmod pid:%ld\n",
-	       original_getpid());
+	//printk(KERN_INFO "Entered heapsentryk_fchmod pid:%ld\n",
+	 //      original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_fchmod(a1, a2);
 }
@@ -200,10 +200,10 @@ asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 				  int __user * a3, int __user * a4, int a5)
 {
 
-	//printk(KERN_INFO
-	//       "Entered heapsentryk_clone() clone clone clone clone clone clone clone\n");
+	printk(KERN_INFO
+	       "Entered heapsentryk_clone() pid:%ld\n",original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_clone(a1, a2, a3, a4, a5);
 }
@@ -212,9 +212,9 @@ asmlinkage long heapsentryk_execve(const char __user * a1,
 				   const char __user * const __user * a2,
 				   const char __user * const __user * a3)
 {
-	//printk(KERN_INFO "Entered heapsentryk_execve()\n");
+	printk(KERN_INFO "Entered heapsentryk_execve() pid:%ld\n",original_getpid());
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_execve(a1, a2, a3);
 }
@@ -223,7 +223,7 @@ asmlinkage long heapsentryk_open(const char __user * a1, int a2, umode_t a3)
 {
 	//printk(KERN_INFO "Entered heapsentryk_open()\n");
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_open(a1, a2, a3);
 }
@@ -235,7 +235,7 @@ asmlinkage long heapsentryk_chmod(const char __user * a1, umode_t a2)
 	   "Entered heapsentryk_chmod() chmod chmod chmod chmod chmod\n");
 	 */
 	if (verify_canaries()) {
-		heapsentryk_exit(1);
+		heapsentryk_exit_group(1);
 	}
 	return original_chmod(a1, a2);
 }
@@ -337,6 +337,7 @@ asmlinkage int verify_canaries(void)
 	if (p_pid_entry) {
 		int bucket_index = 0;
 		Canary_entry *p_canary_entry = NULL;
+		printk(KERN_INFO "Checking canary for pid:%ld\n",original_getpid());
 		hash_for_each_rcu((*(p_pid_entry->p_process_hashtable)),
 				  bucket_index, p_canary_entry, next) {
 			if (p_canary_entry->minfo.canary !=
@@ -367,7 +368,6 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 	// argument as a suffix, there will be a problem.
 	hash_init((*buckets));
 
-	// TODO: perform input validation:w
 	printk("canary_init called for pid:%ld\n", original_getpid());
 
 	p_pid_entry->p_group_buffer = p_group_buffer;
@@ -378,10 +378,6 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 
 	list_add(&p_pid_entry->pid_list_head, &pid_list);
 
-	//TODO: Testing only. remove this code.
-	printk("testing init entry pid\n");
-	iterate_pid_list();
-	printk("testing init entry pid  ended\n");
 	return 0;
 }
 
@@ -406,6 +402,7 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 
 	if (p_pid_entry) {
 		size_t i = 0;
+		/*
 		printk
 		    ("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
 		     p_pid_entry->p_group_buffer, p_pid_entry->p_group_count);
@@ -414,6 +411,7 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 
 		printk("Found pid_entry:%p found for pid:%ld\n", p_pid_entry,
 		       original_getpid());
+		       */
 
 		// Adding canaries to hashtable.
 		for (i = 0; i < *(p_pid_entry->p_group_count); i++) {

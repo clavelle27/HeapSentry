@@ -106,7 +106,9 @@ int main (int argc, char *argv[])
     {
         int rc = -1;
 
+    printf("before: pid:%d ppid:%d\n",getpid(),getppid());
         rc = ptr[0](&file[i*BOOKNAME_LEN]);
+    printf("after: pid:%d ppid:%d\n",getpid(),getppid());
         if ( rc == 0 )
             rc = ptr[1](&file[i*BOOKNAME_LEN]);
         if ( rc == 0 )

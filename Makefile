@@ -5,7 +5,7 @@
 # nested makefiles invoked from this makefile. `:=` makes the
 # variables, non-modifiable.
 
-CANARY_GROUP_SIZE:=5
+CANARY_GROUP_SIZE:=1
 
 # For 64-bit machines
 #SYS_CALL_TABLE_ADDRESS=0x$(shell sudo cat /boot/System.map-`uname -a | cut -d " " -f3` | grep ia32_sys_call_table | cut -d " " -f1 )

@@ -112,10 +112,6 @@ size_t sys_canary_init()
 {
 	size_t r = -1;
 	size_t n = (size_t) SYS_CANARY_INIT_NUMBER;
-	
-	printf
-	    ("libheapsentryu:sending: p_group_buffer:[%p] p_group_count:[%p] *p_group_count:[%d]\n",
-	     p_group_buffer, &group_count, group_count);
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
 			     "D"((size_t) p_group_buffer), "S"(n),
 			     "d"((size_t) &group_count):"cc", "memory");
