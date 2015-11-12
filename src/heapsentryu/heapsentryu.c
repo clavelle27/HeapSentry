@@ -26,6 +26,8 @@ int get_free_index();
 // This system call informs kernel the address of group buffer and group count variable.
 size_t sys_canary_init();
 
+size_t sys_canary_free(void* obj);
+
 // Initializes the random number generator
 void heapsentryu_init();
 
@@ -132,8 +134,7 @@ void free(void *obj)
 		}
 	}
 
-	//TODO: Inform kernel to remove canary information belonging to this allocation from its
-	//internal structures
+	sys_canary_free(obj);
 	return rfree(obj);
 }
 
@@ -144,6 +145,17 @@ size_t sys_canary_init()
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
 			     "D"((size_t) p_group_buffer), "S"(n),
 			     "d"((size_t) & group_count):"cc", "memory");
+	return r;
+}
+
+size_t sys_canary_free(void* obj)
+{
+	size_t r = -1;
+	size_t n = (size_t) SYS_CANARY_FREE_NUMBER;
+	printf("free sending %p to kernel\n",obj);
+	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
+			     "D"((size_t) obj), "S"(n),
+			     "d"((size_t) obj):"cc", "memory");
 	return r;
 }
 

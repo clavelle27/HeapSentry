@@ -96,6 +96,8 @@ asmlinkage Pid_entry *find_pid_entry(int pid);
 asmlinkage size_t sys_heapsentryk_canary(void);
 asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3);
+asmlinkage size_t sys_heapsentryk_canary_free(size_t not_used, size_t v2, size_t v3);
+asmlinkage void iterate_pid_list(void);
 asmlinkage void iterate_pid_list(void);
 asmlinkage int verify_canaries(void);
 
@@ -352,6 +354,14 @@ asmlinkage int verify_canaries(void)
 	return 0;
 }
 
+asmlinkage size_t sys_heapsentryk_canary_free(size_t not_used, size_t v2, size_t not_used1)
+{
+	size_t* obj = (size_t*) v2;
+	printk(KERN_INFO "sys_heapsentryk_canary_free entered: obj:%p\n",obj);
+	return 0;
+}
+
+
 asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3)
 {
@@ -507,6 +517,8 @@ static int __init mod_entry_func(void)
 	// Setting HeapSentryu's sys_canary_init() to sys_call_table to the configured index.
 	sys_call_table[SYS_CANARY_INIT_NUMBER] = sys_heapsentryk_canary_init;
 
+	sys_call_table[SYS_CANARY_FREE_NUMBER] = sys_heapsentryk_canary_free;
+
 	return 0;
 }
 
@@ -530,6 +542,8 @@ static void __exit mod_exit_func(void)
 
 	sys_call_table[SYS_CALL_NUMBER] = 0;
 	sys_call_table[SYS_CANARY_INIT_NUMBER] = 0;
+	sys_call_table[SYS_CANARY_FREE_NUMBER] = 0;
+
 	printk(KERN_INFO "heapsentryk exiting...\n");
 }
 
