@@ -81,6 +81,7 @@ int main(int argc, char *argv[])
 		     "       Spaces in booknames should be escaped by a '\\'\n");
 		return -1;
 	}
+	printf("BOOKSTORE_PID:%d\n", getpid());
 	file = malloc(2 * BOOKNAME_LEN);
 	ptr = malloc(3 * sizeof(funptr_t));
 	ptr[0] = open_book;
@@ -95,9 +96,7 @@ int main(int argc, char *argv[])
 	// Read books one by one.
 	for (i = 0; i < argc - 1; i++) {
 		int rc = -1;
-		printf("before: pid:%d ppid:%d\n", getpid(), getppid());
 		rc = ptr[0] (&file[i * BOOKNAME_LEN]);
-		printf("after: pid:%d ppid:%d\n", getpid(), getppid());
 		if (rc == 0)
 			rc = ptr[1] (&file[i * BOOKNAME_LEN]);
 		if (rc == 0)

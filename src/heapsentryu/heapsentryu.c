@@ -118,19 +118,21 @@ void free(void *obj)
 	// Do not proceed if canary information is being communicated to kernel.
 	// This is not a thread safe code. But for now, it should do the job.
 
-	int i = 0;
-	for (i = 0; i < CANARY_GROUP_SIZE; i++) {
-		if (p_group_buffer[i].malloc_location == obj) {
-			//printf("Free found obj:%p in buffer at index:%d\n", obj, i);
-			p_group_buffer[i].malloc_location = NULL;
-			p_group_buffer[i].canary_location = NULL;
-			p_group_buffer[i].canary = 0;
-			group_count--;
-			break;
+	if (obj != NULL) {
+		int i = 0;
+		for (i = 0; i < CANARY_GROUP_SIZE; i++) {
+			if (p_group_buffer[i].malloc_location == obj) {
+				//printf("Free found obj:%p in buffer at index:%d\n", obj, i);
+				p_group_buffer[i].malloc_location = NULL;
+				p_group_buffer[i].canary_location = NULL;
+				p_group_buffer[i].canary = 0;
+				group_count--;
+				break;
+			}
 		}
-	}
 
-	sys_canary_free(obj);
+		sys_canary_free(obj);
+	}
 	return rfree(obj);
 }
 
