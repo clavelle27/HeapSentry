@@ -21,11 +21,28 @@ typedef void (*real_free) (void *ptr);
 // The function which invokes the HeapSentry's system call.
 size_t sys_canary();
 
+int get_free_index();
+
 // This system call informs kernel the address of group buffer and group count variable.
 size_t sys_canary_init();
 
 // Initializes the random number generator
 void heapsentryu_init();
+
+
+
+int get_free_index()
+{
+	int i = 0;
+	for (i=0;i<CANARY_GROUP_SIZE;i++)
+	{
+		if (p_group_buffer[i].malloc_location == 0){
+			return i;
+		}
+	}
+	return -1;
+}
+
 
 // If this library is preloaded before any binary execution, then
 // this malloc() will be invoked, instead of stdlib malloc().
@@ -68,16 +85,21 @@ void *malloc(size_t size)
 	// Saving the canary at its designated location.
 	*canary_location = canary;
 
-	p_group_buffer[group_count].malloc_location = (size_t*) obj;
-	p_group_buffer[group_count].canary_location = canary_location;
-	p_group_buffer[group_count].canary = canary;
+	int free_idx = get_free_index();
+	if(free_idx>=0){
+	p_group_buffer[free_idx].malloc_location = (size_t*) obj;
+	p_group_buffer[free_idx].canary_location = canary_location;
+	p_group_buffer[free_idx].canary = canary;
+	
 
-	printf("malloc_location:%p canary_location:%p canary:%d\n", p_group_buffer[group_count].malloc_location, p_group_buffer[group_count].canary_location, p_group_buffer[group_count].canary);
+	printf("free_index:%d obj:%p can_loc:%p can:%d\n", free_idx, p_group_buffer[group_count].malloc_location, p_group_buffer[group_count].canary_location, p_group_buffer[group_count].canary);
 	group_count++;
 
 	if (group_count == CANARY_GROUP_SIZE) {
+		printf("buffer full: communicating the information to kernel\n");
 		//sys_canary();
-		group_count = 0;
+		//group_count = 0;
+	}
 	}
 
 	return obj;
@@ -91,19 +113,29 @@ void *malloc(size_t size)
 // Address of real free() is determined using libdl. RTLD_NEXT
 // indicates dlsym() to find for the next symbol that goes by the
 // provided name.
-void free(void *ptr)
+void free(void *obj)
 {
 	real_free rfree = (real_free) dlsym(RTLD_NEXT, "free");
-	printf("free from heapsentryu library called.\n");
+	printf("heapsentryu: free called: obj:%p\n",obj);
 	// Do not proceed if canary information is being communicated to kernel.
 	// This is not a thread safe code. But for now, it should do the job.
 
-	//TODO: Remove the canary information belonging to this allocation from the group buffer.
+	int i = 0;
+	for (i = 0; i<CANARY_GROUP_SIZE;i++){
+		if (p_group_buffer[i].malloc_location == obj){
+			printf("Found obj:%p at index:%d\n",obj, i);
+			p_group_buffer[i].malloc_location = NULL;
+			p_group_buffer[i].canary_location = NULL;
+			p_group_buffer[i].canary = 0;
+			group_count--;
+			break;
+		}
+	}
 	
 
 	//TODO: Inform kernel to remove canary information belonging to this allocation from its
 	//internal structures
-	return rfree(ptr);
+	return rfree(obj);
 }
 
 size_t sys_canary_init()
