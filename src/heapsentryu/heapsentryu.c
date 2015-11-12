@@ -90,17 +90,16 @@ void *malloc(size_t size)
 		p_group_buffer[free_idx].canary_location = canary_location;
 		p_group_buffer[free_idx].canary = canary;
 
+		/*
 		printf("free_index:%d obj:%p can_loc:%p can:%d\n", free_idx,
 		       p_group_buffer[group_count].malloc_location,
 		       p_group_buffer[group_count].canary_location,
 		       p_group_buffer[group_count].canary);
+		       */
 		group_count++;
 
 		if (group_count == CANARY_GROUP_SIZE) {
-			printf
-			    ("buffer full: communicating the information to kernel\n");
 			sys_canary();
-			printf("sys_canary returned: group_count:%d\n",group_count);
 		}
 	}
 
@@ -118,14 +117,13 @@ void *malloc(size_t size)
 void free(void *obj)
 {
 	real_free rfree = (real_free) dlsym(RTLD_NEXT, "free");
-	printf("heapsentryu: free called: obj:%p\n", obj);
 	// Do not proceed if canary information is being communicated to kernel.
 	// This is not a thread safe code. But for now, it should do the job.
 
 	int i = 0;
 	for (i = 0; i < CANARY_GROUP_SIZE; i++) {
 		if (p_group_buffer[i].malloc_location == obj) {
-			printf("Found obj:%p at index:%d\n", obj, i);
+			printf("Free found obj:%p in buffer at index:%d\n", obj, i);
 			p_group_buffer[i].malloc_location = NULL;
 			p_group_buffer[i].canary_location = NULL;
 			p_group_buffer[i].canary = 0;
@@ -152,7 +150,6 @@ size_t sys_canary_free(void* obj)
 {
 	size_t r = -1;
 	size_t n = (size_t) SYS_CANARY_FREE_NUMBER;
-	printf("free sending %p to kernel\n",obj);
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
 			     "D"((size_t) obj), "S"(n),
 			     "d"((size_t) obj):"cc", "memory");

@@ -17,23 +17,19 @@ int main(int argc, char *argv[], char *envp[]){
 	printf("Entering libtest\n");
 	//printf("sizeof(int): %ld\n",sizeof(int));
 	//printf("Calling malloc():\n");
-	int* a = (int*) malloc(10);
-	int* b = (int*) malloc(10);
-	int* c = (int*) malloc(10);
-	int* d = (int*) malloc(10);
-	int* e = (int*) malloc(10);
-	int* f = (int*) malloc(10);
-	*a = 10;
-	*b = 10;
-	*c = 10;
-	*d = 10;
-	*e = 10;
-	*f = 10;
-	free(a);
-	free(b);
-	free(c);
-	free(d);
-	free(e);
-	free(f);
+	int *a[21];
+	int i = 0;
+	for (i = 0; i< 18;i++){
+		a[i] = malloc(10);
+	}
+	free(a[16]);
+	a[18] = malloc(10);
+	a[19] = malloc(10);
+	a[20] = malloc(10);
+
+	for (i=0;i<21;i++){
+		if (i != 16)
+	free(a[i]);
+	}
 	printf("Exiting libtest\n");
 }
