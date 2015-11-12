@@ -410,7 +410,7 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 	if (p_pid_entry) {
 		size_t i = 0;
 		printk
-		    ("heapsentryk:received: p_group_buffer:[%p] group_count:[%d] \n",
+		    ("heapsentryk:retrieving: p_group_buffer:[%p] group_count:[%d] \n",
 		     p_pid_entry->p_group_buffer, *p_pid_entry->p_group_count);
 
 		/*
