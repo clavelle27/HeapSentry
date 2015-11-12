@@ -26,7 +26,7 @@ int get_free_index();
 // This system call informs kernel the address of group buffer and group count variable.
 size_t sys_canary_init();
 
-size_t sys_canary_free(void* obj);
+size_t sys_canary_free(void *obj);
 
 // Initializes the random number generator
 void heapsentryu_init();
@@ -63,7 +63,6 @@ void *malloc(size_t size)
 		    (Malloc_info *) rmalloc(CANARY_GROUP_SIZE *
 					    sizeof(Malloc_info));
 	}
-
 	// sizeof(int) depends on the compiler and not the hardware.
 	// So, it is not good to assume it to be 4 or 8 or whatever.
 	size_t modified_size = size + sizeof(int);
@@ -84,18 +83,17 @@ void *malloc(size_t size)
 	*canary_location = canary;
 
 	int free_idx = get_free_index();
-	printf("free_idx:%d\n",free_idx);
 	if (free_idx >= 0) {
 		p_group_buffer[free_idx].malloc_location = (size_t *) obj;
 		p_group_buffer[free_idx].canary_location = canary_location;
 		p_group_buffer[free_idx].canary = canary;
 
 		/*
-		printf("free_index:%d obj:%p can_loc:%p can:%d\n", free_idx,
-		       p_group_buffer[group_count].malloc_location,
-		       p_group_buffer[group_count].canary_location,
-		       p_group_buffer[group_count].canary);
-		       */
+		   printf("free_index:%d obj:%p can_loc:%p can:%d\n", free_idx,
+		   p_group_buffer[group_count].malloc_location,
+		   p_group_buffer[group_count].canary_location,
+		   p_group_buffer[group_count].canary);
+		 */
 		group_count++;
 
 		if (group_count == CANARY_GROUP_SIZE) {
@@ -123,7 +121,7 @@ void free(void *obj)
 	int i = 0;
 	for (i = 0; i < CANARY_GROUP_SIZE; i++) {
 		if (p_group_buffer[i].malloc_location == obj) {
-			printf("Free found obj:%p in buffer at index:%d\n", obj, i);
+			//printf("Free found obj:%p in buffer at index:%d\n", obj, i);
 			p_group_buffer[i].malloc_location = NULL;
 			p_group_buffer[i].canary_location = NULL;
 			p_group_buffer[i].canary = 0;
@@ -146,7 +144,7 @@ size_t sys_canary_init()
 	return r;
 }
 
-size_t sys_canary_free(void* obj)
+size_t sys_canary_free(void *obj)
 {
 	size_t r = -1;
 	size_t n = (size_t) SYS_CANARY_FREE_NUMBER;

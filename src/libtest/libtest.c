@@ -13,13 +13,14 @@
 // the symbols present in stdlib. But then, during run-time, the
 // binary finds symbols from libheapsentryu, for malloc() and
 // free(), before it finds the symbols from stdlib.
-int main(int argc, char *argv[], char *envp[]){
+int main(int argc, char *argv[], char *envp[])
+{
 	printf("Entering libtest\n");
 	//printf("sizeof(int): %ld\n",sizeof(int));
 	//printf("Calling malloc():\n");
 	int *a[21];
 	int i = 0;
-	for (i = 0; i< 18;i++){
+	for (i = 0; i < 18; i++) {
 		a[i] = malloc(10);
 	}
 	free(a[16]);
@@ -27,9 +28,9 @@ int main(int argc, char *argv[], char *envp[]){
 	a[19] = malloc(10);
 	a[20] = malloc(10);
 
-	for (i=0;i<21;i++){
+	for (i = 0; i < 21; i++) {
 		if (i != 16)
-	free(a[i]);
+			free(a[i]);
 	}
 	printf("Exiting libtest\n");
 }
