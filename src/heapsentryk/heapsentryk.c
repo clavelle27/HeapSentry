@@ -402,6 +402,7 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 
 	if (p_pid_entry) {
 		size_t i = 0;
+		size_t count = *p_pid_entry->p_group_count;
 		/*
 		printk
 		    ("heapsentryk:received: p_group_buffer:[%p] p_group_count:[%p] \n",
@@ -414,7 +415,7 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 		       */
 
 		// Adding canaries to hashtable.
-		for (i = 0; i < *(p_pid_entry->p_group_count); i++) {
+		for (i = 0; i < count; i++) {
 			Canary_entry *entry =
 			    (Canary_entry *) kmalloc(sizeof(Canary_entry),
 						     GFP_KERNEL);
@@ -436,6 +437,11 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 			hash_add_rcu((*p_pid_entry->p_process_hashtable),
 				     &entry->next,
 				     ((size_t)entry->minfo.malloc_location));
+
+			p_pid_entry->p_group_buffer[i].malloc_location = NULL;
+			p_pid_entry->p_group_buffer[i].canary_location = NULL;
+			p_pid_entry->p_group_buffer[i].canary = 0;
+			(*p_pid_entry->p_group_count)--;
 		}
 		p_hash = p_pid_entry->p_process_hashtable;
 		list_canaries(p_hash);

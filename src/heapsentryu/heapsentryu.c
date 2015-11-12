@@ -29,20 +29,16 @@ size_t sys_canary_init();
 // Initializes the random number generator
 void heapsentryu_init();
 
-
-
 int get_free_index()
 {
 	int i = 0;
-	for (i=0;i<CANARY_GROUP_SIZE;i++)
-	{
-		if (p_group_buffer[i].malloc_location == 0){
+	for (i = 0; i < CANARY_GROUP_SIZE; i++) {
+		if (p_group_buffer[i].malloc_location == 0) {
 			return i;
 		}
 	}
 	return -1;
 }
-
 
 // If this library is preloaded before any binary execution, then
 // this malloc() will be invoked, instead of stdlib malloc().
@@ -62,9 +58,9 @@ void *malloc(size_t size)
 	// to kernel when it gets filled.
 	if (!p_group_buffer) {
 		p_group_buffer =
-		    (Malloc_info *) rmalloc(CANARY_GROUP_SIZE * sizeof(Malloc_info));
+		    (Malloc_info *) rmalloc(CANARY_GROUP_SIZE *
+					    sizeof(Malloc_info));
 	}
-
 
 	// sizeof(int) depends on the compiler and not the hardware.
 	// So, it is not good to assume it to be 4 or 8 or whatever.
@@ -74,7 +70,7 @@ void *malloc(size_t size)
 	char *obj = (char *)rmalloc(modified_size);
 
 	// Determining the canary location to store the random number and casting it to int*.
-	size_t *canary_location = (size_t *)(obj + size);
+	size_t *canary_location = (size_t *) (obj + size);
 
 	// Setting the seed for random number generation. This happens once per library load.
 	heapsentryu_init();
@@ -86,44 +82,48 @@ void *malloc(size_t size)
 	*canary_location = canary;
 
 	int free_idx = get_free_index();
-	if(free_idx>=0){
-	p_group_buffer[free_idx].malloc_location = (size_t*) obj;
-	p_group_buffer[free_idx].canary_location = canary_location;
-	p_group_buffer[free_idx].canary = canary;
-	
+	printf("free_idx:%d\n",free_idx);
+	if (free_idx >= 0) {
+		p_group_buffer[free_idx].malloc_location = (size_t *) obj;
+		p_group_buffer[free_idx].canary_location = canary_location;
+		p_group_buffer[free_idx].canary = canary;
 
-	printf("free_index:%d obj:%p can_loc:%p can:%d\n", free_idx, p_group_buffer[group_count].malloc_location, p_group_buffer[group_count].canary_location, p_group_buffer[group_count].canary);
-	group_count++;
+		printf("free_index:%d obj:%p can_loc:%p can:%d\n", free_idx,
+		       p_group_buffer[group_count].malloc_location,
+		       p_group_buffer[group_count].canary_location,
+		       p_group_buffer[group_count].canary);
+		group_count++;
 
-	if (group_count == CANARY_GROUP_SIZE) {
-		printf("buffer full: communicating the information to kernel\n");
-		//sys_canary();
-		//group_count = 0;
-	}
+		if (group_count == CANARY_GROUP_SIZE) {
+			printf
+			    ("buffer full: communicating the information to kernel\n");
+			sys_canary();
+			printf("sys_canary returned: group_count:%d\n",group_count);
+		}
 	}
 
 	return obj;
 }
 
 // If this library is preloaded before any binary execution, then
-// this free() will be invoked instead of stdlib free(). After
+// this free will be invoked instead of stdlib free. After
 // performing the actions to be taken in this method, the address
-// of real free() is determined and invoked.
+// of real free is determined and invoked.
 //
-// Address of real free() is determined using libdl. RTLD_NEXT
+// Address of real free is determined using libdl. RTLD_NEXT
 // indicates dlsym() to find for the next symbol that goes by the
 // provided name.
 void free(void *obj)
 {
 	real_free rfree = (real_free) dlsym(RTLD_NEXT, "free");
-	printf("heapsentryu: free called: obj:%p\n",obj);
+	printf("heapsentryu: free called: obj:%p\n", obj);
 	// Do not proceed if canary information is being communicated to kernel.
 	// This is not a thread safe code. But for now, it should do the job.
 
 	int i = 0;
-	for (i = 0; i<CANARY_GROUP_SIZE;i++){
-		if (p_group_buffer[i].malloc_location == obj){
-			printf("Found obj:%p at index:%d\n",obj, i);
+	for (i = 0; i < CANARY_GROUP_SIZE; i++) {
+		if (p_group_buffer[i].malloc_location == obj) {
+			printf("Found obj:%p at index:%d\n", obj, i);
 			p_group_buffer[i].malloc_location = NULL;
 			p_group_buffer[i].canary_location = NULL;
 			p_group_buffer[i].canary = 0;
@@ -131,7 +131,6 @@ void free(void *obj)
 			break;
 		}
 	}
-	
 
 	//TODO: Inform kernel to remove canary information belonging to this allocation from its
 	//internal structures
@@ -144,7 +143,7 @@ size_t sys_canary_init()
 	size_t n = (size_t) SYS_CANARY_INIT_NUMBER;
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n),
 			     "D"((size_t) p_group_buffer), "S"(n),
-			     "d"((size_t) &group_count):"cc", "memory");
+			     "d"((size_t) & group_count):"cc", "memory");
 	return r;
 }
 
@@ -169,7 +168,7 @@ void heapsentryu_init(void)
 	static int init_done = 0;
 
 	if (!init_done) {
-		//sys_canary_init();
+		sys_canary_init();
 		srand(time(NULL));
 		init_done = 1;
 	}
