@@ -20,7 +20,6 @@ typedef void (*real_free) (void *ptr);
 
 // The function which invokes the HeapSentry's system call.
 size_t sys_canary();
-int sys_canary_in_progress = 0;
 
 // This system call informs kernel the address of group buffer and group count variable.
 size_t sys_canary_init();
@@ -77,7 +76,7 @@ void *malloc(size_t size)
 	group_count++;
 
 	if (group_count == CANARY_GROUP_SIZE) {
-		sys_canary();
+		//sys_canary();
 		group_count = 0;
 	}
 
@@ -98,7 +97,6 @@ void free(void *ptr)
 	printf("free from heapsentryu library called.\n");
 	// Do not proceed if canary information is being communicated to kernel.
 	// This is not a thread safe code. But for now, it should do the job.
-	while(sys_canary_in_progress);
 
 	//TODO: Remove the canary information belonging to this allocation from the group buffer.
 	
@@ -123,9 +121,7 @@ size_t sys_canary()
 
 	size_t r = -1;
 	size_t n = (size_t) SYS_CALL_NUMBER;
-	sys_canary_in_progress = 1;
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n):"cc", "memory");
-	sys_canary_in_progress = 0;
 	return r;
 }
 
@@ -141,7 +137,7 @@ void heapsentryu_init(void)
 	static int init_done = 0;
 
 	if (!init_done) {
-		sys_canary_init();
+		//sys_canary_init();
 		srand(time(NULL));
 		init_done = 1;
 	}
