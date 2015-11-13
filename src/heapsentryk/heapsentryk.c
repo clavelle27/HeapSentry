@@ -85,6 +85,7 @@ asmlinkage long heapsentryk_exit(int a1);
 asmlinkage long heapsentryk_exit_group(int a1);
 
 void set_read_write(long unsigned int _addr);
+asmlinkage int cleanup(void);
 asmlinkage int remove_hashtable_entry(size_t * malloc_location);
 asmlinkage Canary_entry *list_canaries(struct
 				       hlist_head (*hashtable)[1 <<
@@ -176,54 +177,17 @@ asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 {
 
 	//printk(KERN_INFO
-	//       "Entered heapsentryk_clone() pid:%ld\n", original_getpid());
+	//       "Entered heapsentryk_clone pid:%ld\n", original_getpid());
 	if (pull_and_verify_canaries("clone")) {
 		heapsentryk_exit_group(1);
 	}
 	return original_clone(a1, a2, a3, a4, a5);
 }
 
-asmlinkage long heapsentryk_execve(const char __user * a1,
-				   const char __user * const __user * a2,
-				   const char __user * const __user * a3)
-{
-    long ret = -1;
-    Pid_entry *p_pid_entry = NULL;
-	//printk(KERN_INFO "Entered heapsentryk_execve() pid:%ld\n",
-	//       original_getpid());
-	if (pull_and_verify_canaries("execve")) {
-		heapsentryk_exit_group(1);
-	}
-
-	p_pid_entry = find_pid_entry(original_getpid());
-
-    // TODO: fix me
-    // TODO: remove this code. This does not handle failure case.
-    // Need to save these canaries and restore them on failure.
-
-    // Clean up the hashtable entries.
-    free_canaries();
-
-	// Remove the entry of process from linked list.
-	if (p_pid_entry) {
-		// Remove the element representing the process from linked list
-		list_del(&p_pid_entry->pid_list_head);
-
-		// Free the memory allocated for the element
-		kfree(p_pid_entry);
-
-		// Avoid dangling pointer
-		p_pid_entry = NULL;
-	}
-
-	ret = original_execve(a1, a2, a3);
-    
-    return ret;
-}
-
 asmlinkage long heapsentryk_open(const char __user * a1, int a2, umode_t a3)
 {
-	//printk(KERN_INFO "Entered heapsentryk_open()\n");
+	//printk(KERN_INFO "Entered heapsentryk_open pid:%ld\n",
+	//       original_getpid());
 	if (pull_and_verify_canaries("open")) {
 		heapsentryk_exit_group(1);
 	}
@@ -232,26 +196,52 @@ asmlinkage long heapsentryk_open(const char __user * a1, int a2, umode_t a3)
 
 asmlinkage long heapsentryk_chmod(const char __user * a1, umode_t a2)
 {
-	/*
-	   printk(KERN_INFO
-	   "Entered heapsentryk_chmod() chmod chmod chmod chmod chmod\n");
-	 */
+	//printk(KERN_INFO "Entered heapsentryk_chmod pid:%ld\n",
+	//       original_getpid());
 	if (pull_and_verify_canaries("chmod")) {
 		heapsentryk_exit_group(1);
 	}
 	return original_chmod(a1, a2);
 }
 
+asmlinkage long heapsentryk_exit(int a1)
+{
+	//printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n",
+	//       original_getpid());
+	return original_exit(a1);
+}
+
 asmlinkage long heapsentryk_exit_group(int a1)
 {
-	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
 	//printk(KERN_INFO "Entered heapsentryk_exit_group pid:%ld\n",
 	//       original_getpid());
 
-	// Clean up the hashtable entries.
-	free_canaries();
+	cleanup();
+	return original_exit_group(a1);
+}
 
-	// Remove the entry of process from linked list.
+asmlinkage long heapsentryk_execve(const char __user * a1,
+				   const char __user * const __user * a2,
+				   const char __user * const __user * a3)
+{
+	//printk(KERN_INFO "Entered heapsentryk_execve pid:%ld\n",
+	//       original_getpid());
+	if (pull_and_verify_canaries("execve")) {
+		heapsentryk_exit_group(1);
+	}
+	// TODO: fix me
+	// TODO: remove this code. This does not handle failure case.
+	// Need to save these canaries and restore them on failure.
+	cleanup();
+
+	return original_execve(a1, a2, a3);
+}
+
+asmlinkage int cleanup(void)
+{
+
+	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
+	free_canaries();
 	if (p_pid_entry) {
 		// Remove the element representing the process from linked list
 		list_del(&p_pid_entry->pid_list_head);
@@ -262,15 +252,7 @@ asmlinkage long heapsentryk_exit_group(int a1)
 		// Avoid dangling pointer
 		p_pid_entry = NULL;
 	}
-
-	return original_exit_group(a1);
-}
-
-asmlinkage long heapsentryk_exit(int a1)
-{
-	//printk(KERN_INFO "Entered heapsentryk_exit pid:%ld\n",
-	//       original_getpid());
-	return original_exit(a1);
+	return 0;
 }
 
 asmlinkage void iterate_pid_list(void)
