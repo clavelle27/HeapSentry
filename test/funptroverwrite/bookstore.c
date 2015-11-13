@@ -90,8 +90,22 @@ int main(int argc, char *argv[])
 
 	//Copy booknames the user wants to read.
 	for (i = 0; i < argc - 1; i++) {
+		printf("argv[%d]:%s\n",i+1,argv[i+1]);
 		strcpy(&file[i * BOOKNAME_LEN], argv[i + 1]);
 	}
+	printf("malloc:%p\n", malloc);
+	printf("open_book:%p\n", open_book);
+	printf("read_book:%p\n", read_book);
+	printf("close_book:%p\n", close_book);
+	printf("ptr[1]:%p\n", ptr[1]);
+	printf("ptr[2]:%p\n", ptr[2]);
+	printf("file[0]:%s\n", &file[0]);
+	printf("file[%d]:%s\n\n", BOOKNAME_LEN, &file[BOOKNAME_LEN]);
+
+	printf("system:%p\n", system);
+	printf("ptr[0]:%p\n", ptr[0]);
+	//ptr[0] = (funptr_t)system;
+	printf("PTR[0]:%p\n", ptr[0]);
 
 	// Read books one by one.
 	for (i = 0; i < argc - 1; i++) {
