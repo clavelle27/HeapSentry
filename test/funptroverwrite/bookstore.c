@@ -74,6 +74,7 @@ int main(int argc, char *argv[])
 	funptr_t *ptr = NULL;
 	char *file = NULL;
 	int i = 0;
+	printf("BOOKSTORE_PID:%d\n", getpid());
 	if (argc < 2) {
 		printf("Usage: bookstore <bookname1> <bookname2>\n");
 		printf
@@ -81,7 +82,6 @@ int main(int argc, char *argv[])
 		     "       Spaces in booknames should be escaped by a '\\'\n");
 		return -1;
 	}
-	printf("BOOKSTORE_PID:%d\n", getpid());
 	file = malloc(2 * BOOKNAME_LEN);
 	ptr = malloc(3 * sizeof(funptr_t));
 	ptr[0] = open_book;
@@ -90,22 +90,8 @@ int main(int argc, char *argv[])
 
 	//Copy booknames the user wants to read.
 	for (i = 0; i < argc - 1; i++) {
-		printf("argv[%d]:%s\n",i+1,argv[i+1]);
 		strcpy(&file[i * BOOKNAME_LEN], argv[i + 1]);
 	}
-	printf("malloc:%p\n", malloc);
-	printf("open_book:%p\n", open_book);
-	printf("read_book:%p\n", read_book);
-	printf("close_book:%p\n", close_book);
-	printf("ptr[1]:%p\n", ptr[1]);
-	printf("ptr[2]:%p\n", ptr[2]);
-	printf("file[0]:%s\n", &file[0]);
-	printf("file[%d]:%s\n\n", BOOKNAME_LEN, &file[BOOKNAME_LEN]);
-
-	printf("system:%p\n", system);
-	printf("ptr[0]:%p\n", ptr[0]);
-	//ptr[0] = (funptr_t)system;
-	printf("PTR[0]:%p\n", ptr[0]);
 
 	// Read books one by one.
 	for (i = 0; i < argc - 1; i++) {

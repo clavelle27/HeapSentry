@@ -91,7 +91,8 @@ asmlinkage int copy_canaries(size_t from_pid, size_t to_pid);
 asmlinkage void free_canaries(void);
 asmlinkage Pid_entry *find_pid_entry(int pid);
 asmlinkage size_t sys_heapsentryk_canary(void);
-asmlinkage size_t canary_init(size_t pid, Malloc_info* p_group_buffer, size_t * p_group_count);
+asmlinkage size_t canary_init(size_t pid, Malloc_info * p_group_buffer,
+			      size_t * p_group_count);
 asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3);
 asmlinkage size_t sys_heapsentryk_canary_free(size_t not_used, size_t v2,
@@ -187,7 +188,8 @@ asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 		Pid_entry *p_pid_entry = NULL;
 		p_pid_entry = find_pid_entry(current_pid);
 		if (p_pid_entry) {
-			canary_init(pid, p_pid_entry->p_group_buffer, p_pid_entry->p_group_count);
+			canary_init(pid, p_pid_entry->p_group_buffer,
+				    p_pid_entry->p_group_count);
 			copy_canaries(current_pid, pid);
 			iterate_pid_list();
 		}
@@ -410,8 +412,8 @@ asmlinkage size_t sys_heapsentryk_canary_free(size_t not_used, size_t v2,
 	return 0;
 }
 
-asmlinkage size_t canary_init(size_t pid, Malloc_info* p_group_buffer, size_t * p_group_count)
-
+asmlinkage size_t canary_init(size_t pid, Malloc_info * p_group_buffer,
+			      size_t * p_group_count)
 {
 	Pid_entry *p_pid_entry = find_pid_entry(pid);
 	if (!p_pid_entry) {
@@ -435,15 +437,17 @@ asmlinkage size_t canary_init(size_t pid, Malloc_info* p_group_buffer, size_t * 
 		p_pid_entry->p_process_hashtable = buckets;
 		INIT_LIST_HEAD(&p_pid_entry->pid_list_head);
 		list_add(&p_pid_entry->pid_list_head, &pid_list);
-	}else{
-		printk(KERN_INFO "CANARY_TABLE ready for PID:%d\n",pid);
+	} else {
+		printk(KERN_INFO "CANARY_TABLE ready for PID:%d\n", pid);
 	}
 	return 0;
 }
+
 asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 					      size_t v3)
 {
-	return canary_init(original_getpid(), (Malloc_info *)v2, (size_t*)v3);
+	return canary_init(original_getpid(), (Malloc_info *) v2,
+			   (size_t *) v3);
 }
 
 // System call which receives the canary information from heapsentryu
