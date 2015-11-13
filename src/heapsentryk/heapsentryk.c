@@ -353,11 +353,14 @@ asmlinkage int pull_and_verify_canaries(char *called_from)
 	if (p_pid_entry) {
 		int bucket_index = 0;
 		Canary_entry *p_canary_entry = NULL;
-		printk("PID:%ld pull_and_verify called from [%s]\n",
-		       original_getpid(), called_from);
-		//Pull the canary information from user space if they are present
-		printk("Invoking pull procedure...\n");
-		sys_heapsentryk_canary();
+		if (*p_pid_entry->p_group_count) {
+			printk
+			    ("PID:%ld [%s] invoking pull to retrieve [%d] items.\n",
+			     original_getpid(), called_from,
+			     *p_pid_entry->p_group_count);
+			//Pull the canary information from user space if they are present
+			sys_heapsentryk_canary();
+		}
 		hash_for_each_rcu((*(p_pid_entry->p_process_hashtable)),
 				  bucket_index, p_canary_entry, next) {
 			if (p_canary_entry->minfo.canary !=
@@ -404,7 +407,6 @@ asmlinkage size_t sys_heapsentryk_canary_init(size_t not_used, size_t v2,
 	p_pid_entry->pid = original_getpid();
 	p_pid_entry->p_process_hashtable = buckets;
 	INIT_LIST_HEAD(&p_pid_entry->pid_list_head);
-
 	list_add(&p_pid_entry->pid_list_head, &pid_list);
 
 	return 0;
@@ -424,12 +426,12 @@ asmlinkage size_t sys_heapsentryk_canary(void)
 
 	if (p_pid_entry) {
 		size_t i = 0;
-		if (*p_pid_entry->p_group_count) {
-			printk
-			    ("heapsentryk: p_group_buffer:[%p] group_count:[%d] \n",
-			     p_pid_entry->p_group_buffer,
-			     *p_pid_entry->p_group_count);
-		}
+		/*
+		   printk
+		   ("heapsentryk: p_group_buffer:[%p] group_count:[%d] \n",
+		   p_pid_entry->p_group_buffer,
+		   *p_pid_entry->p_group_count);
+		 */
 		// Adding canaries to hashtable.
 		for (i = 0;
 		     i < CANARY_GROUP_SIZE && *p_pid_entry->p_group_count;
