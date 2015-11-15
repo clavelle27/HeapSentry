@@ -1,8 +1,15 @@
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #define __USE_GNU
 #include <dlfcn.h>
+#include <pthread.h>
+
+// These are the real libc functions
+extern void * __libc_realloc(void *ptr, size_t size);
+extern void * __libc_malloc(size_t size);
+extern void __libc_free(void *ptr);
 
 typedef struct malloc_info {
 	size_t *malloc_location;
@@ -10,13 +17,10 @@ typedef struct malloc_info {
 	size_t canary;
 } Malloc_info;
 
-Malloc_info *p_group_buffer;
+pthread_mutex_t mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+
+Malloc_info *p_group_buffer = NULL;
 size_t group_count = 0;
-// These are the function pointers used to hold the address of 
-// actual system calls. The syntax of these function pointers
-// should precisely match with the syntax of real system calls.
-typedef void *(*real_malloc) (size_t size);
-typedef void (*real_free) (void *ptr);
 
 // The function which invokes the HeapSentry's system call.
 size_t sys_canary();
@@ -42,46 +46,23 @@ int get_free_index()
 	return -1;
 }
 
-// If this library is preloaded before any binary execution, then
-// this malloc() will be invoked, instead of stdlib malloc().
-// 
-// After performing the actions to be taken in this method, the address
-// of real malloc() is determined and invoked.
-//
-// Address of real malloc() is determined using libdl. RTLD_NEXT
-// indicates dlsym() to find for the next symbol that goes by the
-// provided name.
-void *malloc(size_t size)
+// This function generates a random canary and writes it after the requested
+// malloc block and stores these info into group_buffer.
+// group_buffer will be pushed to kernel when count reaches CANARY_GROUP_SIZE
+void push_canary(char *obj, size_t size)
 {
-	// Determine the function pointer of libc malloc().
-	real_malloc rmalloc = (real_malloc) dlsym(RTLD_NEXT, "malloc");
-
-	// TODO: Fill up an array (probably) of size configured by user and pass it
-	// to kernel when it gets filled.
-	if (!p_group_buffer) {
-		p_group_buffer =
-		    (Malloc_info *) rmalloc(CANARY_GROUP_SIZE *
-					    sizeof(Malloc_info));
-	}
-	// sizeof(int) depends on the compiler and not the hardware.
-	// So, it is not good to assume it to be 4 or 8 or whatever.
-	size_t modified_size = size + sizeof(int);
-
-	// Requesting malloc to allocate space for an extra integer along with `size` bytes.
-	char *obj = (char *)rmalloc(modified_size);
-
+    pthread_mutex_lock(&mutex);
+    
+    // TODO: change it to int*
 	// Determining the canary location to store the random number and casting it to int*.
 	size_t *canary_location = (size_t *) (obj + size);
-
-	// Setting the seed for random number generation. This happens once per library load.
-	heapsentryu_init();
 
 	// Generating a random number and casting it to size of int.
 	int canary = (int)rand();
 
 	// Saving the canary at its designated location.
 	*canary_location = canary;
-
+    
 	int free_idx = get_free_index();
 	if (free_idx >= 0) {
 		p_group_buffer[free_idx].malloc_location = (size_t *) obj;
@@ -100,27 +81,19 @@ void *malloc(size_t size)
 			sys_canary();
 		}
 	}
-
-	return obj;
+    
+    pthread_mutex_unlock(&mutex);
 }
 
-// If this library is preloaded before any binary execution, then
-// this free will be invoked instead of stdlib free. After
-// performing the actions to be taken in this method, the address
-// of real free is determined and invoked.
-//
-// Address of real free is determined using libdl. RTLD_NEXT
-// indicates dlsym() to find for the next symbol that goes by the
-// provided name.
-void free(void *obj)
+// This function removes canary from group_buffer and/or kernel.
+void free_canary(void *obj)
 {
-	real_free rfree = (real_free) dlsym(RTLD_NEXT, "free");
+    pthread_mutex_lock(&mutex);
+    
 	// Do not proceed if canary information is being communicated to kernel.
-	// This is not a thread safe code. But for now, it should do the job.
-
-	if (obj != NULL) {
+	if (obj != NULL && p_group_buffer != NULL) {
 		int i = 0;
-		for (i = 0; i < CANARY_GROUP_SIZE; i++) {
+		for (i = 0; i < CANARY_GROUP_SIZE && group_count; i++) {
 			if (p_group_buffer[i].malloc_location == obj) {
 				//printf("Free found obj:%p in buffer at index:%d\n", obj, i);
 				p_group_buffer[i].malloc_location = NULL;
@@ -131,9 +104,108 @@ void free(void *obj)
 			}
 		}
 
+        // TODO: we should call into kernel only when we didn't find in local 
+        // buffer. Isn't it?
 		sys_canary_free(obj);
 	}
-	return rfree(obj);
+    
+    pthread_mutex_unlock(&mutex);
+}
+
+// If this library is preloaded before any binary execution, then
+// this malloc() will be invoked, instead of stdlib malloc().
+// 
+// After performing the actions to be taken in this method, 
+// real malloc is called using __libc_malloc.
+void *malloc(size_t size)
+{
+    // This happens once per library load.
+    // Setting the seed for random number generation,
+    // informing kernel about group_buffer & group_count address.
+	heapsentryu_init();
+    
+	// sizeof(int) depends on the compiler and not the hardware.
+	// So, it is not good to assume it to be 4 or 8 or whatever.
+	size_t modified_size = size + sizeof(int);
+
+	// Requesting malloc to allocate space for an extra integer along with `size` bytes.
+	char *obj = (char *)__libc_malloc(modified_size);
+
+    push_canary(obj, size);
+    
+    return obj;
+}
+
+// If this library is preloaded before any binary execution, then
+// this free will be invoked instead of stdlib free.
+//
+// After performing the actions to be taken in this method, 
+// real free is called using __libc_free.
+void free(void *obj)
+{
+    // This happens once per library load.
+    // Setting the seed for random number generation,
+    // informing kernel about group_buffer & group_count address.
+	heapsentryu_init();
+    
+    free_canary(obj);
+    
+	__libc_free(obj);
+}
+
+// If this library is preloaded before any binary execution, then
+// this calloc will be invoked instead of stdlib calloc.
+//
+// After performing the actions to be taken in this method, 
+// we allocate memory using __libc_malloc.
+void *calloc(size_t nmemb, size_t size)
+{
+    // This happens once per library load.
+    // Setting the seed for random number generation,
+    // informing kernel about group_buffer & group_count address.
+	heapsentryu_init();
+    
+    size_t actual_size = size * nmemb;
+    
+	// sizeof(int) depends on the compiler and not the hardware.
+	// So, it is not good to assume it to be 4 or 8 or whatever.
+	size_t modified_size = actual_size + sizeof(int);
+
+    // Note: we are not calling real calloc, instead using malloc only.
+	// Requesting malloc to allocate space for an extra integer along with 
+    // `actual_size` bytes.
+	char *obj = (char *)__libc_malloc(modified_size);
+    memset(obj, 0, actual_size);
+    
+    push_canary(obj, actual_size);
+    
+	return obj;
+}
+
+// If this library is preloaded before any binary execution, then
+// this realloc will be invoked instead of stdlib realloc.
+//
+// After performing the actions to be taken in this method, 
+// real realloc is called using __libc_realloc.
+void *realloc(void *obj, size_t size)
+{
+    // This happens once per library load.
+    // Setting the seed for random number generation,
+    // informing kernel about group_buffer & group_count address.
+	heapsentryu_init();
+    
+    // Remove this entry, we will add new one with new address
+	free_canary(obj); 
+    
+	// sizeof(int) depends on the compiler and not the hardware.
+	// So, it is not good to assume it to be 4 or 8 or whatever.
+	size_t modified_size = size + sizeof(int);    
+    
+	obj = __libc_realloc(obj, modified_size);
+    
+    push_canary(obj, size);
+    
+    return obj;
 }
 
 size_t sys_canary_init()
@@ -176,9 +248,19 @@ void heapsentryu_init(void)
 {
 	static int init_done = 0;
 
+    pthread_mutex_lock(&mutex);
+    
 	if (!init_done) {
+        init_done = 1;
+
+        // TODO: Fill up an array (probably) of size configured by user and pass it
+        // to kernel when it gets filled.
+        p_group_buffer =
+            (Malloc_info *) __libc_malloc(CANARY_GROUP_SIZE * sizeof(Malloc_info));
+        
 		sys_canary_init();
 		srand(time(NULL));
-		init_done = 1;
 	}
+    
+    pthread_mutex_unlock(&mutex);
 }

@@ -359,8 +359,12 @@ asmlinkage int remove_hashtable_entry(size_t * malloc_location)
 {
 	int bucket_index = 0;
 	Pid_entry *p_pid_entry = find_pid_entry(original_getpid());
-
 	Canary_entry *p_canary_entry = NULL;
+    
+    if (!p_pid_entry)
+    {
+        return 0;
+    }
 
 	hash_for_each_rcu((*p_pid_entry->p_process_hashtable), bucket_index,
 			  p_canary_entry, next) {
