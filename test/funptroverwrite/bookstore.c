@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 	funptr_t *ptr = NULL;
 	char *file = NULL;
 	int i = 0;
-	printf("BOOKSTORE_PID:%d\n", getpid());
+	printf("BOOKSTORE_PID:%d system_addr:0x%x\n", getpid(), (unsigned int)&system);
 	if (argc < 2) {
 		printf("Usage: bookstore <bookname1> <bookname2>\n");
 		printf
