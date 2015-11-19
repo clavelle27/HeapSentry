@@ -324,11 +324,11 @@ asmlinkage void iterate_pid_list(void)
 	list_for_each_safe(position, list_iterator, &pid_list) {
 		p_pid_entry = list_entry(position, Pid_entry, pid_list_head);
 		if (p_pid_entry) {
-			printk
-			    ("p_group_buffer:0x%p p_buffer_count:0x%p pid:%ld hashtable:0x%p \n",
-			     p_pid_entry->p_group_buffer,
-			     p_pid_entry->p_group_count, p_pid_entry->pid,
-			     p_pid_entry->p_process_hashtable);
+			//printk
+			//    ("p_group_buffer:0x%p p_buffer_count:0x%p pid:%ld hashtable:0x%p \n",
+			//     p_pid_entry->p_group_buffer,
+			//     p_pid_entry->p_group_count, p_pid_entry->pid,
+			//     p_pid_entry->p_process_hashtable);
 		}
 	}
 }
@@ -375,20 +375,20 @@ asmlinkage int copy_canaries(size_t from_pid, size_t to_pid)
 	Canary_entry *p_canary_entry = NULL;
 	Pid_entry *from_pid_entry = find_pid_entry(from_pid);
 	Pid_entry *to_pid_entry = find_pid_entry(to_pid);
-	printk("hey hey hey!!!\n");
+	//printk("hey hey hey!!!\n");
 	hash_for_each_rcu((*from_pid_entry->p_process_hashtable), bucket_index,
 			  p_canary_entry, next) {
 		Canary_entry *entry = (Canary_entry *)
 		    kmalloc(sizeof(Canary_entry),
 			    GFP_KERNEL);
-		printk(KERN_INFO
-		       "Copying %d->%d, malloc_location=%p canary_location=%p canary=%d deref=%d is in bucket %d\n",
-		       from_pid, to_pid,
-		       p_canary_entry->minfo.malloc_location,
-		       p_canary_entry->minfo.canary_location,
-		       p_canary_entry->minfo.canary,
-		       *((size_t *) p_canary_entry->minfo.canary_location),
-		       bucket_index);
+		//printk(KERN_INFO
+		//       "Copying %d->%d, malloc_location=%p canary_location=%p canary=%d deref=%d is in bucket %d\n",
+		//       from_pid, to_pid,
+		//       p_canary_entry->minfo.malloc_location,
+		//       p_canary_entry->minfo.canary_location,
+		//       p_canary_entry->minfo.canary,
+		//       *((size_t *) p_canary_entry->minfo.canary_location),
+		//       bucket_index);
 		memset((void *)entry, 0, sizeof(Canary_entry));
 		entry->minfo.malloc_location =
 		    p_canary_entry->minfo.malloc_location;
@@ -439,10 +439,11 @@ asmlinkage int pull_and_verify_canaries(int percentage, char *called_from)
 		int bucket_index = 0;
 		Canary_entry *p_canary_entry = NULL;
 		if (*p_pid_entry->p_group_count) {
-			printk
-			    ("PID:%ld [%s] invoking pull to retrieve [%d] items.\n",
-			     original_getpid(), called_from,
-			     *p_pid_entry->p_group_count);
+			//printk
+			//    ("PID:%ld [%s] invoking pull to retrieve [%d] items.\n",
+			//     original_getpid(), called_from,
+			//     *p_pid_entry->p_group_count);
+            
 			//Pull the canary information from user space if they are present
 			sys_heapsentryk_canary();
 		}
