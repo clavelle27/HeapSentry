@@ -13,7 +13,8 @@ CANARY_GROUP_SIZE:=5
 # For 32-bit machines
 SYS_CALL_TABLE_ADDRESS=0x$(shell sudo cat /boot/System.map-`uname -a | cut -d " " -f3` | grep sys_call_table | cut -d " " -f1 )
 
-MEDIUM_RISK_PERCENTAGE:=100
+hs_tune?=100
+MEDIUM_RISK_PERCENTAGE:=$(hs_tune)
 SYS_CANARY_INIT_NUMBER:=279
 SYS_CALL_NUMBER:=280
 SYS_CANARY_FREE_NUMBER:=281

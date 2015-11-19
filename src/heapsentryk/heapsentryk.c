@@ -451,7 +451,7 @@ asmlinkage int pull_and_verify_canaries(int percentage, char *called_from)
 
 		hash_for_each_rcu((*(p_pid_entry->p_process_hashtable)),
 				  bucket_index, p_canary_entry, next) {
-            if (!to_be_verified) {
+            if (to_be_verified <= 0) {
                 break;
             }
 			if (p_canary_entry->minfo.canary !=
