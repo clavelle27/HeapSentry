@@ -64,6 +64,10 @@ asmlinkage long (*original_getpid) (void);
 asmlinkage long (*original_clone) (unsigned long a1, unsigned long a2,
 				   int __user * a3, int __user * a4, int a5);
 
+asmlinkage long (*original_read)(unsigned int a1, char __user *a2, size_t a3);
+asmlinkage long (*original_write)(unsigned int a1, const char __user *a2,
+                   size_t a3);
+
 asmlinkage long heapsentryk_open_by_handle_at(int a1, void *a2, int a3);
 asmlinkage long heapsentryk_openat(int a1, const char __user * a2, int a3,
 				   umode_t a4);
@@ -83,6 +87,9 @@ asmlinkage long heapsentryk_clone(unsigned long a1, unsigned long a2,
 				  int __user * a3, int __user * a4, int a5);
 asmlinkage long heapsentryk_exit(int a1);
 asmlinkage long heapsentryk_exit_group(int a1);
+asmlinkage long heapsentryk_read(unsigned int a1, char __user *a2, size_t a3);
+asmlinkage long heapsentryk_write(unsigned int a1, const char __user *a2,
+                   size_t a3);
 
 void set_read_write(long unsigned int _addr);
 asmlinkage int cleanup(void);
@@ -99,6 +106,27 @@ asmlinkage size_t sys_heapsentryk_canary_free(size_t not_used, size_t v2,
 					      size_t v3);
 asmlinkage void iterate_pid_list(void);
 asmlinkage int pull_and_verify_canaries(char *called_from);
+
+asmlinkage long heapsentryk_read(unsigned int a1, char __user *a2, size_t a3)
+{
+	//printk(KERN_INFO "Entered heapsentryk_read pid:%ld\n",
+	//       original_getpid());
+	if (pull_and_verify_canaries("read")) {
+		heapsentryk_exit_group(1);
+	}
+	return original_read(a1, a2, a3);
+}
+
+asmlinkage long heapsentryk_write(unsigned int a1, const char __user *a2,
+                   size_t a3)
+{
+	//printk(KERN_INFO "Entered heapsentryk_write pid:%ld\n",
+	//       original_getpid());
+	if (pull_and_verify_canaries("write")) {
+		heapsentryk_exit_group(1);
+	}
+	return original_write(a1, a2, a3);
+}
 
 asmlinkage long heapsentryk_open_by_handle_at(int a1, void *a2, int a3)
 {
@@ -546,6 +574,8 @@ static int __init mod_entry_func(void)
 	original_vfork = sys_call_table[__NR_vfork];
 	original_openat = sys_call_table[__NR_openat];
 	original_open_by_handle_at = sys_call_table[__NR_open_by_handle_at];
+	original_read = sys_call_table[__NR_read];
+	original_write = sys_call_table[__NR_write];
 
 	// Substituting the system calls with heapsentryk's calls.
 	// In these substituted function, decision can be taken regarding further
@@ -563,6 +593,8 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_vfork] = heapsentryk_vfork;
 	sys_call_table[__NR_openat] = heapsentryk_openat;
 	sys_call_table[__NR_open_by_handle_at] = heapsentryk_open_by_handle_at;
+	sys_call_table[__NR_read] = heapsentryk_read;
+	sys_call_table[__NR_write] = heapsentryk_write;
 
 	// Setting HeapSentryu's sys_canary() to sys_call_table to the configured index.
 	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
@@ -592,6 +624,8 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_vfork] = original_vfork;
 	sys_call_table[__NR_openat] = original_openat;
 	sys_call_table[__NR_open_by_handle_at] = original_open_by_handle_at;
+	sys_call_table[__NR_read] = original_read;
+	sys_call_table[__NR_write] = original_write;
 
 	sys_call_table[SYS_CALL_NUMBER] = 0;
 	sys_call_table[SYS_CANARY_INIT_NUMBER] = 0;
