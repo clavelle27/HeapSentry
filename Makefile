@@ -30,12 +30,14 @@ all:
 	${MAKE} -C src/heapsentryk
 	${MAKE} -C src/libtest
 	${MAKE} -C test/funptroverwrite
+	${MAKE} -C test/clothstore
 
 clean:
 	${MAKE} -C src/heapsentryu clean
 	${MAKE} -C src/heapsentryk clean
 	${MAKE} -C src/libtest clean
 	${MAKE} -C test/funptroverwrite clean
+	${MAKE} -C test/clothstore clean
 
 install:
 	sudo mkdir -p /etc/heapsentry

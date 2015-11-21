@@ -21,7 +21,7 @@ int open_book(char *file)
 	else if (strcasestr(file, "kite")) {
 		f = fopen("KiteRunner.txt", "r");
 	}
-	sleep(2);
+	sleep(1);
 	if (f != NULL) {
 		return 0;
 	}
@@ -43,7 +43,7 @@ int read_book(char *file)
 		fseek(f, 0, SEEK_SET);
 		fread(buffer, 1, length, f);
 		fprintf(stdout, "%s\n", buffer);
-		sleep(2);
+		sleep(1);
 		return 0;
 	}
 
@@ -57,7 +57,6 @@ int close_book(char *file)
 	printf("Closing Book %s...\n", file);
 	if (f != NULL) {
 		fclose(f);
-		sleep(2);
 		return 0;
 	}
 
