@@ -5,10 +5,13 @@
 #define __USE_GNU
 #include <dlfcn.h>
 #include <pthread.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <unistd.h>
 
 // These are the real libc functions
-extern void * __libc_realloc(void *ptr, size_t size);
-extern void * __libc_malloc(size_t size);
+extern void *__libc_realloc(void *ptr, size_t size);
+extern void *__libc_malloc(size_t size);
 extern void __libc_free(void *ptr);
 
 typedef struct malloc_info {
@@ -51,9 +54,9 @@ int get_free_index()
 // group_buffer will be pushed to kernel when count reaches CANARY_GROUP_SIZE
 void push_canary(char *obj, size_t size)
 {
-    pthread_mutex_lock(&mutex);
-    
-    // TODO: change it to int*
+	pthread_mutex_lock(&mutex);
+
+	// TODO: change it to int*
 	// Determining the canary location to store the random number and casting it to int*.
 	size_t *canary_location = (size_t *) (obj + size);
 
@@ -62,7 +65,7 @@ void push_canary(char *obj, size_t size)
 
 	// Saving the canary at its designated location.
 	*canary_location = canary;
-    
+
 	int free_idx = get_free_index();
 	if (free_idx >= 0) {
 		p_group_buffer[free_idx].malloc_location = (size_t *) obj;
@@ -81,15 +84,15 @@ void push_canary(char *obj, size_t size)
 			sys_canary();
 		}
 	}
-    
-    pthread_mutex_unlock(&mutex);
+
+	pthread_mutex_unlock(&mutex);
 }
 
 // This function removes canary from group_buffer and/or kernel.
 void free_canary(void *obj)
 {
-    pthread_mutex_lock(&mutex);
-    
+	pthread_mutex_lock(&mutex);
+
 	// Do not proceed if canary information is being communicated to kernel.
 	if (obj != NULL && p_group_buffer != NULL) {
 		int i = 0;
@@ -104,12 +107,12 @@ void free_canary(void *obj)
 			}
 		}
 
-        // TODO: we should call into kernel only when we didn't find in local 
-        // buffer. Isn't it?
+		// TODO: we should call into kernel only when we didn't find in local 
+		// buffer. Isn't it?
 		sys_canary_free(obj);
 	}
-    
-    pthread_mutex_unlock(&mutex);
+
+	pthread_mutex_unlock(&mutex);
 }
 
 // If this library is preloaded before any binary execution, then
@@ -119,11 +122,11 @@ void free_canary(void *obj)
 // real malloc is called using __libc_malloc.
 void *malloc(size_t size)
 {
-    // This happens once per library load.
-    // Setting the seed for random number generation,
-    // informing kernel about group_buffer & group_count address.
+	// This happens once per library load.
+	// Setting the seed for random number generation,
+	// informing kernel about group_buffer & group_count address.
 	heapsentryu_init();
-    
+
 	// sizeof(int) depends on the compiler and not the hardware.
 	// So, it is not good to assume it to be 4 or 8 or whatever.
 	size_t modified_size = size + sizeof(int);
@@ -131,9 +134,9 @@ void *malloc(size_t size)
 	// Requesting malloc to allocate space for an extra integer along with `size` bytes.
 	char *obj = (char *)__libc_malloc(modified_size);
 
-    push_canary(obj, size);
-    
-    return obj;
+	push_canary(obj, size);
+
+	return obj;
 }
 
 // If this library is preloaded before any binary execution, then
@@ -143,13 +146,13 @@ void *malloc(size_t size)
 // real free is called using __libc_free.
 void free(void *obj)
 {
-    // This happens once per library load.
-    // Setting the seed for random number generation,
-    // informing kernel about group_buffer & group_count address.
+	// This happens once per library load.
+	// Setting the seed for random number generation,
+	// informing kernel about group_buffer & group_count address.
 	heapsentryu_init();
-    
-    free_canary(obj);
-    
+
+	free_canary(obj);
+
 	__libc_free(obj);
 }
 
@@ -160,25 +163,25 @@ void free(void *obj)
 // we allocate memory using __libc_malloc.
 void *calloc(size_t nmemb, size_t size)
 {
-    // This happens once per library load.
-    // Setting the seed for random number generation,
-    // informing kernel about group_buffer & group_count address.
+	// This happens once per library load.
+	// Setting the seed for random number generation,
+	// informing kernel about group_buffer & group_count address.
 	heapsentryu_init();
-    
-    size_t actual_size = size * nmemb;
-    
+
+	size_t actual_size = size * nmemb;
+
 	// sizeof(int) depends on the compiler and not the hardware.
 	// So, it is not good to assume it to be 4 or 8 or whatever.
 	size_t modified_size = actual_size + sizeof(int);
 
-    // Note: we are not calling real calloc, instead using malloc only.
+	// Note: we are not calling real calloc, instead using malloc only.
 	// Requesting malloc to allocate space for an extra integer along with 
-    // `actual_size` bytes.
+	// `actual_size` bytes.
 	char *obj = (char *)__libc_malloc(modified_size);
-    memset(obj, 0, actual_size);
-    
-    push_canary(obj, actual_size);
-    
+	memset(obj, 0, actual_size);
+
+	push_canary(obj, actual_size);
+
 	return obj;
 }
 
@@ -189,23 +192,23 @@ void *calloc(size_t nmemb, size_t size)
 // real realloc is called using __libc_realloc.
 void *realloc(void *obj, size_t size)
 {
-    // This happens once per library load.
-    // Setting the seed for random number generation,
-    // informing kernel about group_buffer & group_count address.
+	// This happens once per library load.
+	// Setting the seed for random number generation,
+	// informing kernel about group_buffer & group_count address.
 	heapsentryu_init();
-    
-    // Remove this entry, we will add new one with new address
-	free_canary(obj); 
-    
+
+	// Remove this entry, we will add new one with new address
+	free_canary(obj);
+
 	// sizeof(int) depends on the compiler and not the hardware.
 	// So, it is not good to assume it to be 4 or 8 or whatever.
-	size_t modified_size = size + sizeof(int);    
-    
+	size_t modified_size = size + sizeof(int);
+
 	obj = __libc_realloc(obj, modified_size);
-    
-    push_canary(obj, size);
-    
-    return obj;
+
+	push_canary(obj, size);
+
+	return obj;
 }
 
 size_t sys_canary_init()
@@ -248,19 +251,43 @@ void heapsentryu_init(void)
 {
 	static int init_done = 0;
 
-    pthread_mutex_lock(&mutex);
-    
-	if (!init_done) {
-        init_done = 1;
+	pthread_mutex_lock(&mutex);
 
-        // TODO: Fill up an array (probably) of size configured by user and pass it
-        // to kernel when it gets filled.
-        p_group_buffer =
-            (Malloc_info *) __libc_malloc(CANARY_GROUP_SIZE * sizeof(Malloc_info));
-        
+	if (!init_done) {
+		init_done = 1;
+
+		// TODO: Fill up an array (probably) of size configured by user and pass it
+		// to kernel when it gets filled.
+		int actual_size = CANARY_GROUP_SIZE * sizeof(Malloc_info);
+		long PAGE_SIZE = sysconf(_SC_PAGESIZE);
+		int no_of_pages = actual_size / PAGE_SIZE;
+		if (actual_size % PAGE_SIZE != 0) {
+			no_of_pages++;
+		}
+		char *buffer =
+		    (char *)__libc_malloc(PAGE_SIZE * (no_of_pages + 3));
+		buffer =
+		    (char *)(((int)buffer + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1));
+		// Guarding 1 page at the head of the buffer
+		if (mprotect(buffer, PAGE_SIZE, PROT_NONE)) {
+			printf
+			    ("mprotect() failed while safeguarding head of buffer: err:%d\n",
+			     errno);
+		}
+		// Guarding 1 page at the tail of the buffer
+		if (mprotect
+		    (buffer + PAGE_SIZE * (no_of_pages + 1), PAGE_SIZE,
+		     PROT_NONE)) {
+			printf
+			    ("mprotect() failed while safeguarding tail of buffer: err:%d\n",
+			     errno);
+		}
+
+		p_group_buffer = (Malloc_info *) (buffer + PAGE_SIZE);
+
 		sys_canary_init();
 		srand(time(NULL));
 	}
-    
-    pthread_mutex_unlock(&mutex);
+
+	pthread_mutex_unlock(&mutex);
 }
