@@ -92,21 +92,23 @@ void free_canary(void *obj)
 {
 	pthread_mutex_lock(&mutex);
 
-	// Do not proceed if canary information is being communicated to kernel.
 	if (obj != NULL && p_group_buffer != NULL) {
 		int i = 0;
+		int found = 0;
 		for (i = 0; i < CANARY_GROUP_SIZE && group_count; i++) {
 			if (p_group_buffer[i].malloc_location == obj) {
-				//printf("Free found obj:%p in buffer at index:%d\n", obj, i);
 				p_group_buffer[i].malloc_location = NULL;
 				p_group_buffer[i].canary_location = NULL;
 				p_group_buffer[i].canary = 0;
 				group_count--;
+				found = 1;
 				break;
 			}
 		}
 
-		sys_canary_free(obj);
+		if (!found) {
+			sys_canary_free(obj);
+		}
 	}
 
 	pthread_mutex_unlock(&mutex);
