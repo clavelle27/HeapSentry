@@ -24,14 +24,3 @@ is the same across multiple runs of the program. But without GDB, we have to do 
 Sample code is shown in run.sh in the same dir for reference. run.sh can run both normal as well as exploit code.
 Just pass "normal" as command line param to run.sh to run the bookstore in normal fashion. With no params, exploit 
 code will run.
-
-PS: This is a very basic version of exploit code. There's nothing fancy happening here. This is to
-facilitate basic canary testing. We can improve this code over time to make it suitable for ppt.
-
-TODO:
-1. I set sticky bit for the binary bookstore. Then ran exploit code. The resulting shell still shows
-me as the user. It should have shown root as the o/p of whoami.
-
-2. Once we are done with exploit, when we type exit in the hacked shell, code returns and executes remaining
-portions that leads to the bookstore strying to open a our exploit string as a book. Need to fix this so
-that everything looks clean even after hack.

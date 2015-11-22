@@ -8,9 +8,6 @@
 hs_gsize?=5
 CANARY_GROUP_SIZE:=$(hs_gsize)
 
-# For 64-bit machines
-#SYS_CALL_TABLE_ADDRESS=0x$(shell sudo cat /boot/System.map-`uname -a | cut -d " " -f3` | grep ia32_sys_call_table | cut -d " " -f1 )
-
 # For 32-bit machines
 SYS_CALL_TABLE_ADDRESS=0x$(shell sudo cat /boot/System.map-`uname -a | cut -d " " -f3` | grep sys_call_table | cut -d " " -f1 )
 
@@ -29,15 +26,13 @@ export ROOT_DIR LIB_DIR INCLUDE_DIR CC CFLAGS SYS_CALL_TABLE_ADDRESS SYS_CALL_NU
 all:
 	${MAKE} -C src/heapsentryu
 	${MAKE} -C src/heapsentryk
-	${MAKE} -C src/libtest
-	${MAKE} -C test/funptroverwrite
+	${MAKE} -C test/bookstore
 	${MAKE} -C test/clothstore
 
 clean:
 	${MAKE} -C src/heapsentryu clean
 	${MAKE} -C src/heapsentryk clean
-	${MAKE} -C src/libtest clean
-	${MAKE} -C test/funptroverwrite clean
+	${MAKE} -C test/bookstore clean
 	${MAKE} -C test/clothstore clean
 
 install:

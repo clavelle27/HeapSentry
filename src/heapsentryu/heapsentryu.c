@@ -56,7 +56,6 @@ void push_canary(char *obj, size_t size)
 {
 	pthread_mutex_lock(&mutex);
 
-	// TODO: change it to int*
 	// Determining the canary location to store the random number and casting it to int*.
 	size_t *canary_location = (size_t *) (obj + size);
 
@@ -107,8 +106,6 @@ void free_canary(void *obj)
 			}
 		}
 
-		// TODO: we should call into kernel only when we didn't find in local 
-		// buffer. Isn't it?
 		sys_canary_free(obj);
 	}
 
@@ -256,8 +253,6 @@ void heapsentryu_init(void)
 	if (!init_done) {
 		init_done = 1;
 
-		// TODO: Fill up an array (probably) of size configured by user and pass it
-		// to kernel when it gets filled.
 		int actual_size = CANARY_GROUP_SIZE * sizeof(Malloc_info);
 		long PAGE_SIZE = sysconf(_SC_PAGESIZE);
 		int no_of_pages = actual_size / PAGE_SIZE;

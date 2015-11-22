@@ -289,9 +289,6 @@ asmlinkage long heapsentryk_execve(const char __user * a1,
 	if (pull_and_verify_canaries(100, "execve")) {
 		heapsentryk_exit_group(1);
 	}
-	// TODO: fix me
-	// TODO: remove this code. This does not handle failure case.
-	// Need to save these canaries and restore them on failure.
 	cleanup();
 
 	return original_execve(a1, a2, a3);
