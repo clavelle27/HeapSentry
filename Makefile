@@ -5,22 +5,23 @@
 # nested makefiles invoked from this makefile. `:=` makes the
 # variables, non-modifiable.
 
-hs_gsize?=5
-CANARY_GROUP_SIZE:=$(hs_gsize)
 
 # For 32-bit machines
 SYS_CALL_TABLE_ADDRESS=0x$(shell sudo cat /boot/System.map-`uname -a | cut -d " " -f3` | grep sys_call_table | cut -d " " -f1 )
 
-hs_tune?=100
-MEDIUM_RISK_PERCENTAGE:=$(hs_tune)
-SYS_CANARY_INIT_NUMBER:=279
-SYS_CALL_NUMBER:=280
-SYS_CANARY_FREE_NUMBER:=281
+# The following 5 parameters can be passed as arguments to Makefile.
+CANARY_GROUP_SIZE?=5
+MEDIUM_RISK_PERCENTAGE?=100
+SYS_CANARY_NUMBER?=280
+SYS_CANARY_INIT_NUMBER?=279
+SYS_CANARY_FREE_NUMBER?=281
+
+
 ROOT_DIR:=$(shell pwd)
 LIB_DIR:=$(ROOT_DIR)/lib
 CC=gcc
 CFLAGS=-O0 -std=c99 -Wall -Werror -fPIC -g3
-export ROOT_DIR LIB_DIR CC CFLAGS SYS_CALL_TABLE_ADDRESS SYS_CALL_NUMBER CANARY_GROUP_SIZE SYS_CANARY_INIT_NUMBER SYS_CANARY_FREE_NUMBER MEDIUM_RISK_PERCENTAGE
+export ROOT_DIR LIB_DIR CC CFLAGS SYS_CALL_TABLE_ADDRESS SYS_CANARY_NUMBER CANARY_GROUP_SIZE SYS_CANARY_INIT_NUMBER SYS_CANARY_FREE_NUMBER MEDIUM_RISK_PERCENTAGE
 
 all:
 	${MAKE} -C src/heapsentryu

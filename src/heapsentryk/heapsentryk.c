@@ -632,7 +632,7 @@ static int __init mod_entry_func(void)
 	sys_call_table[__NR_mount] = heapsentryk_mount;
 
 	// Setting HeapSentryu's sys_canary() to sys_call_table to the configured index.
-	sys_call_table[SYS_CALL_NUMBER] = sys_heapsentryk_canary;
+	sys_call_table[SYS_CANARY_NUMBER] = sys_heapsentryk_canary;
 
 	// Setting HeapSentryu's sys_canary_init() to sys_call_table to the configured index.
 	sys_call_table[SYS_CANARY_INIT_NUMBER] = sys_heapsentryk_canary_init;
@@ -663,7 +663,7 @@ static void __exit mod_exit_func(void)
 	sys_call_table[__NR_write] = original_write;
 	sys_call_table[__NR_mount] = original_mount;
 
-	sys_call_table[SYS_CALL_NUMBER] = 0;
+	sys_call_table[SYS_CANARY_NUMBER] = 0;
 	sys_call_table[SYS_CANARY_INIT_NUMBER] = 0;
 	sys_call_table[SYS_CANARY_FREE_NUMBER] = 0;
 

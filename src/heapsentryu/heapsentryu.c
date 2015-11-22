@@ -234,7 +234,7 @@ size_t sys_canary()
 {
 
 	size_t r = -1;
-	size_t n = (size_t) SYS_CALL_NUMBER;
+	size_t n = (size_t) SYS_CANARY_NUMBER;
 	__asm__ __volatile__("int $0x80":"=a"(r):"a"(n):"cc", "memory");
 	return r;
 }
