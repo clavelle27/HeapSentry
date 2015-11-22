@@ -2,6 +2,8 @@
 #include<stdlib.h>
 #include<string.h>
 #include<strings.h>
+#include<unistd.h>
+
 typedef struct product {
 	int price;
 	char name[256];
@@ -33,6 +35,7 @@ int main()
 {
 	char option = -1;
 	char *prod = malloc(16);
+	printf("CLOTHSTORE_PID:%d\n", getpid());
 	product_t *prod_list = malloc(NUM_OF_PROD * sizeof(product_t));
 	prod_list[0].price = 500;
 	strcpy(prod_list[0].name, "Red Jeans");

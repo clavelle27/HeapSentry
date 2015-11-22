@@ -456,7 +456,7 @@ asmlinkage int pull_and_verify_canaries(int percentage, char *called_from)
 			    *((size_t *) p_canary_entry->
 			      minfo.canary_location)) {
 				printk(KERN_INFO
-				       "Canary verification failed. Forcing exit to ensure security!\n");
+				       "Canary verification failed for PID:%ld. Forcing exit to ensure security!\n",original_getpid());
 				return 1;
 			}
 			to_be_verified--;
